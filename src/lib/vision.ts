@@ -25,13 +25,35 @@ type Request = { images: VisionImage[]; prompt: string; maxTokens: number };
  * then Claude (paid).
  */
 export async function readImages(req: Request): Promise<string> {
-  if (process.env.GEMINI_API_KEY) return readWithGemini(req);
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await readWithGemini(req);
+    } catch (err) {
+      // Gemini busy or over its free limit: a weaker reading now beats making grandparents wait.
+      if (!(err instanceof VisionError) || !process.env.GROQ_API_KEY) throw err;
+      console.warn("[vision] Gemini unavailable, falling back to Groq:", err.message);
+    }
+  }
   if (process.env.GROQ_API_KEY) return readWithGroq(req);
   if (process.env.ANTHROPIC_API_KEY) return readWithClaude(req);
   throw new VisionError("Leximi i fotove nuk është aktivizuar (mungon GEMINI_API_KEY).", 503);
 }
 
-const GEMINI_DEFAULT_MODEL = "gemini-3.8-flash";
+/** Pulls the JSON value out of a reply that may be wrapped in code fences or extra text. */
+export function parseLenientJson(text: string): unknown {
+  const t = text.replace(/```(?:json)?/g, "");
+  const start = t.search(/[[{]/);
+  if (start === -1) return null;
+  const end = t.lastIndexOf(t[start] === "{" ? "}" : "]");
+  if (end <= start) return null;
+  try {
+    return JSON.parse(t.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function rateLimited(seconds: number): VisionError {
   return new VisionError(
@@ -41,30 +63,43 @@ function rateLimited(seconds: number): VisionError {
   );
 }
 
+const GEMINI_DEFAULT_MODEL = "gemini-3.8-flash";
+
 async function readWithGemini(req: Request): Promise<string> {
   const model = process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL;
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: "POST",
-    headers: { "x-goog-api-key": process.env.GEMINI_API_KEY!, "content-type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            ...req.images.map((img) => ({ inline_data: { mime_type: img.mediaType, data: img.data } })),
-            { text: req.prompt },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        // Leave room for the model's thinking as well as the list itself.
-        maxOutputTokens: Math.max(req.maxTokens, 16000),
-        responseMimeType: "application/json",
-        mediaResolution: "MEDIA_RESOLUTION_HIGH",
+  const payload = JSON.stringify({
+    contents: [
+      {
+        role: "user",
+        parts: [
+          ...req.images.map((img) => ({ inline_data: { mime_type: img.mediaType, data: img.data } })),
+          { text: req.prompt },
+        ],
       },
-    }),
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      // Leave room for the model's thinking as well as the list itself.
+      maxOutputTokens: Math.max(req.maxTokens, 16000),
+      responseMimeType: "application/json",
+      mediaResolution: "MEDIA_RESOLUTION_HIGH",
+      // Reading spines needs sharp eyes more than long thinking; default thinking took ~90 s per shelf.
+      thinkingConfig: { thinkingLevel: process.env.GEMINI_THINKING || "low" },
+    },
   });
+  const call = () =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "x-goog-api-key": process.env.GEMINI_API_KEY!, "content-type": "application/json" },
+      body: payload,
+    });
+
+  // "High demand" (503) spells are usually short: try a couple more times before giving up.
+  let res = await call();
+  for (let attempt = 1; res.status === 503 && attempt <= 2; attempt++) {
+    await sleep(1500 * attempt);
+    res = await call();
+  }
 
   if (res.status === 429) {
     const body = await res.json().catch(() => null);
@@ -81,20 +116,6 @@ async function readWithGemini(req: Request): Promise<string> {
     .filter((p) => !p.thought)
     .map((p) => p.text ?? "")
     .join("");
-}
-
-/** Pulls the JSON value out of a reply that may be wrapped in code fences or extra text. */
-export function parseLenientJson(text: string): unknown {
-  const t = text.replace(/```(?:json)?/g, "");
-  const start = t.search(/[[{]/);
-  if (start === -1) return null;
-  const end = t.lastIndexOf(t[start] === "{" ? "}" : "]");
-  if (end <= start) return null;
-  try {
-    return JSON.parse(t.slice(start, end + 1));
-  } catch {
-    return null;
-  }
 }
 
 const GROQ_DEFAULT_MODEL = "qwen/qwen3.8-27b";
