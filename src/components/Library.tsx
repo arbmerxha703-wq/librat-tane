@@ -8,6 +8,7 @@ import { PasscodeScreen } from "./PasscodeScreen";
 import { BookCard } from "./BookCard";
 import { AddBookSheet } from "./AddBookSheet";
 import { ShelfScanSheet } from "./ShelfScanSheet";
+import { LocateSheet } from "./LocateSheet";
 import { ConfirmDialog } from "./Modal";
 import { BookIcon, CameraIcon, CheckIcon, CloseIcon, PlusIcon, SearchIcon, ShelfDecoration, ShelvesIcon, SparkleIcon } from "./icons";
 
@@ -25,6 +26,7 @@ export function Library() {
   const [adding, setAdding] = useState(false);
   const [scanningShelf, setScanningShelf] = useState(false);
   const [toDelete, setToDelete] = useState<Book | null>(null);
+  const [locating, setLocating] = useState<Book | null>(null);
   const [removingSamples, setRemovingSamples] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
@@ -311,12 +313,12 @@ export function Library() {
                         {booksLabel(list.length)}
                       </span>
                     </h2>
-                    <BookList books={list} query={query} onToggleRead={toggleRead} onDelete={setToDelete} />
+                    <BookList books={list} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} />
                   </section>
                 ))}
               </div>
             ) : (
-              <BookList books={visible} query={query} onToggleRead={toggleRead} onDelete={setToDelete} />
+              <BookList books={visible} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} />
             )}
           </>
         )}
@@ -396,6 +398,10 @@ export function Library() {
         />
       )}
 
+      {locating && passcode && (
+        <LocateSheet book={locating} passcode={passcode} onClose={() => setLocating(null)} />
+      )}
+
       {toDelete && (
         <ConfirmDialog
           title="Ta fshijmë?"
@@ -430,16 +436,26 @@ function BookList({
   query,
   onToggleRead,
   onDelete,
+  onLocate,
 }: {
   books: Book[];
   query: string;
   onToggleRead: (b: Book) => void;
   onDelete: (b: Book) => void;
+  onLocate: (b: Book) => void;
 }) {
   return (
     <ul className="flex flex-col gap-4">
       {books.map((b, i) => (
-        <BookCard key={b.id} book={b} query={query} index={i} onToggleRead={onToggleRead} onDelete={onDelete} />
+        <BookCard
+          key={b.id}
+          book={b}
+          query={query}
+          index={i}
+          onToggleRead={onToggleRead}
+          onDelete={onDelete}
+          onLocate={onLocate}
+        />
       ))}
     </ul>
   );

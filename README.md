@@ -39,6 +39,30 @@ create index books_shelf_position_idx on public.books (shelf, position);
 alter table public.books enable row level security;
 ```
 
+Then run this second part (shelf photos, "Ku është?" and the bookcase map). It only adds things,
+so it is also the upgrade for a catalog created with the first part alone:
+
+```sql
+-- Where each book stands on its shelf photo (0–1000 of the photo width)
+alter table public.books
+  add column if not exists photo_path text,
+  add column if not exists x0 smallint,
+  add column if not exists x1 smallint;
+
+-- Small key/value settings: the bookcase photo and where each shelf is on it
+create table if not exists public.app_settings (
+  key        text primary key,
+  value      jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_settings enable row level security;
+
+-- Private bucket for shelf and bookcase photos (the server hands out short-lived links)
+insert into storage.buckets (id, name, public)
+values ('photos', 'photos', false)
+on conflict (id) do nothing;
+```
+
 3. Go to **Project Settings → API** and copy:
    - **Project URL** → `SUPABASE_URL`
    - **service_role** secret key → `SUPABASE_SERVICE_ROLE_KEY` (keep this secret; it never reaches the browser)

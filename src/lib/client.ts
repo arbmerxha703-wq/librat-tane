@@ -1,5 +1,6 @@
 import type { Book } from "./types";
 import { normalize } from "./normalize";
+import { SHELF_TILES } from "./tiles";
 
 const PASSCODE_KEY = "librat-passcode";
 const LAST_SHELF_KEY = "librat-last-shelf";
@@ -27,7 +28,12 @@ export const getLastShelf = () => read(LAST_SHELF_KEY) ?? "";
 export const saveLastShelf = (shelf: string) => write(LAST_SHELF_KEY, shelf);
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number) {
+  constructor(
+    message: string,
+    public status: number,
+    /** Seconds the server asked us to wait (free-tier photo reading limit). */
+    public retryAfter?: number,
+  ) {
     super(message);
   }
 }
@@ -44,7 +50,7 @@ export async function api<T>(path: string, passcode: string, init: RequestInit =
     throw new ApiError("Nuk ka lidhje me internetin.", 0);
   }
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(body.error ?? "Diçka shkoi keq.", res.status);
+  if (!res.ok) throw new ApiError(body.error ?? "Diçka shkoi keq.", res.status, body.retryAfter);
   return body as T;
 }
 
@@ -66,23 +72,63 @@ export function spineColor(seed: string): string {
 
 export const booksLabel = (n: number) => (n === 1 ? "1 libër" : `${n} libra`);
 
-/** Shrink a camera photo so the upload stays small and fast. Returns base64 JPEG without prefix. */
-export async function photoToBase64(file: File, maxSide = 1400): Promise<string> {
-  // An <img> decode handles large phone photos and their rotation more reliably than createImageBitmap on iOS.
+/**
+ * Opens a camera photo. An <img> handles large phone photos and their rotation more reliably than
+ * createImageBitmap on iOS; the load event is used because img.decode() never settles in some browsers.
+ */
+async function loadImage(file: File): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
-    img.src = url;
-    await img.decode();
-    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("load failed"));
+      img.src = url;
+    });
+    return img;
   } catch {
     throw new Error("Fotografia nuk u hap. Provoni përsëri.");
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+const toJpeg = (canvas: HTMLCanvasElement) => canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
+
+function shrink(img: HTMLImageElement, maxSide: number): string {
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.naturalWidth * scale);
+  canvas.height = Math.round(img.naturalHeight * scale);
+  canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return toJpeg(canvas);
+}
+
+/** Shrink a camera photo so the upload stays small and fast. Returns base64 JPEG without prefix. */
+export async function photoToBase64(file: File, maxSide = 1400): Promise<string> {
+  return shrink(await loadImage(file), maxSide);
+}
+
+/**
+ * Prepares a shelf photo for reading: a display copy, plus left/middle/right parts cut from the
+ * full-resolution photo and padded to squares, so thin spines and small print stay legible.
+ */
+export async function prepareShelfPhoto(file: File) {
+  const img = await loadImage(file);
+  const W = img.naturalWidth;
+  const H = img.naturalHeight;
+  const tiles = SHELF_TILES.map(([a, b]) => {
+    const sx = a * W;
+    const sw = (b - a) * W;
+    const side = Math.max(sw, H);
+    const scale = Math.min(1, 1600 / side);
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = Math.round(side * scale);
+    const g = canvas.getContext("2d")!;
+    g.fillStyle = "#000";
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.drawImage(img, sx, 0, sw, H, 0, 0, sw * scale, H * scale);
+    return { image: toJpeg(canvas), widthFrac: sw / side };
+  });
+  return { photo: shrink(img, 1600), tiles };
 }

@@ -1,59 +1,71 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import type { z } from "zod";
 
 /**
- * Reads a photo and returns JSON matching `schema`.
+ * Sends one or more photos with a prompt and returns the model's text reply.
  * Uses Groq (free tier) when GROQ_API_KEY is set, otherwise Claude when ANTHROPIC_API_KEY is set.
  */
 
 export class VisionError extends Error {
-  constructor(message: string, public status: number) {
+  constructor(
+    message: string,
+    public status: number,
+    /** Seconds to wait before retrying, when a free-tier rate limit was hit. */
+    public retryAfter?: number,
+  ) {
     super(message);
   }
 }
 
-type Request<T extends z.ZodType> = {
-  image: string; // base64, no data: prefix
-  mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
-  prompt: string;
-  /** Plain-language description of the JSON shape, for providers without schema enforcement. */
-  jsonShape: string;
-  schema: T;
-  /** Bigger for whole shelves, smaller for a single cover. */
-  maxTokens: number;
-};
+export type VisionImage = { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }; // base64, no prefix
 
-export async function readImage<T extends z.ZodType>(req: Request<T>): Promise<z.infer<T> | null> {
+type Request = { images: VisionImage[]; prompt: string; maxTokens: number };
+
+export async function readImages(req: Request): Promise<string> {
   if (process.env.GROQ_API_KEY) return readWithGroq(req);
   if (process.env.ANTHROPIC_API_KEY) return readWithClaude(req);
   throw new VisionError("Leximi i fotove nuk është aktivizuar (mungon GROQ_API_KEY).", 503);
 }
 
-const GROQ_DEFAULT_MODEL = "qwen/qwen3.8-27b";
+/** Pulls the JSON value out of a reply that may be wrapped in code fences or extra text. */
+export function parseLenientJson(text: string): unknown {
+  const t = text.replace(/```(?:json)?/g, "");
+  const start = t.search(/[[{]/);
+  if (start === -1) return null;
+  const end = t.lastIndexOf(t[start] === "{" ? "}" : "]");
+  if (end <= start) return null;
+  try {
+    return JSON.parse(t.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
 
-async function readWithGroq<T extends z.ZodType>(req: Request<T>): Promise<z.infer<T> | null> {
+const GROQ_DEFAULT_MODEL = "qwen/qwen3.8-27b";
+// Groq's free tier rejects replies expected to exceed 1000 output tokens per minute.
+const GROQ_MAX_OUTPUT = 950;
+
+async function readWithGroq(req: Request): Promise<string> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       "content-type": "application/json",
     },
+    // No JSON mode: the model sometimes wraps the JSON in code fences, which JSON mode rejects.
     body: JSON.stringify({
       model: process.env.GROQ_MODEL || GROQ_DEFAULT_MODEL,
-      max_completion_tokens: req.maxTokens,
+      max_completion_tokens: Math.min(req.maxTokens, GROQ_MAX_OUTPUT),
       temperature: 0.2,
-      response_format: { type: "json_object" },
       messages: [
         {
           role: "user",
           content: [
-            {
-              type: "text",
-              text: `${req.prompt}\n\nReply with ONLY a JSON object, no other text, in exactly this shape:\n${req.jsonShape}`,
-            },
-            { type: "image_url", image_url: { url: `data:${req.mediaType};base64,${req.image}` } },
+            { type: "text", text: req.prompt },
+            ...req.images.map((img) => ({
+              type: "image_url",
+              image_url: { url: `data:${img.mediaType};base64,${img.data}` },
+            })),
           ],
         },
       ],
@@ -61,43 +73,42 @@ async function readWithGroq<T extends z.ZodType>(req: Request<T>): Promise<z.inf
   });
 
   if (res.status === 429) {
-    throw new VisionError("U arrit kufiri falas i leximit të fotove. Provoni përsëri pas pak minutash.", 429);
+    const body = await res.json().catch(() => null);
+    const message: string = body?.error?.message ?? "";
+    const seconds = Number(/try again in ([\d.]+)s/.exec(message)?.[1] ?? res.headers.get("retry-after") ?? 30);
+    throw new VisionError(
+      "U arrit kufiri falas i leximit të fotove. Po pres pak dhe provoj përsëri.",
+      429,
+      Math.ceil(Math.min(Math.max(seconds, 3), 90)),
+    );
   }
   if (!res.ok) {
     console.error("[groq]", res.status, await res.text().catch(() => ""));
     throw new VisionError("Leximi i fotos dështoi. Provoni përsëri.", 502);
   }
-
   const body = await res.json();
-  const text: string = body?.choices?.[0]?.message?.content ?? "";
-  // Some models wrap reasoning or code fences around the JSON; keep only the outermost object.
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end <= start) return null;
-  try {
-    const parsed = req.schema.safeParse(JSON.parse(text.slice(start, end + 1)));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
+  return body?.choices?.[0]?.message?.content ?? "";
 }
 
-async function readWithClaude<T extends z.ZodType>(req: Request<T>): Promise<z.infer<T> | null> {
+async function readWithClaude(req: Request): Promise<string> {
   const client = new Anthropic();
-  const response = await client.messages.parse({
+  const response = await client.messages.create({
     model: "claude-opus-5-5",
-    max_tokens: req.maxTokens,
-    output_config: { effort: req.maxTokens > 8000 ? "medium" : "low", format: zodOutputFormat(req.schema) },
+    max_tokens: 16000,
+    output_config: { effort: "medium" },
     messages: [
       {
         role: "user",
         content: [
-          { type: "image", source: { type: "base64", media_type: req.mediaType, data: req.image } },
+          ...req.images.map((img) => ({
+            type: "image" as const,
+            source: { type: "base64" as const, media_type: img.mediaType, data: img.data },
+          })),
           { type: "text", text: req.prompt },
         ],
       },
     ],
   });
-  if (response.stop_reason === "refusal") return null;
-  return (response.parsed_output as z.infer<T> | null) ?? null;
+  if (response.stop_reason === "refusal") return "";
+  return response.content.map((b) => (b.type === "text" ? b.text : "")).join("");
 }

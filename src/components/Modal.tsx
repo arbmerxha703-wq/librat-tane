@@ -34,7 +34,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className="animate-sheet max-h-[94dvh] w-full max-w-lg overflow-y-auto rounded-t-[2rem] border border-line bg-card px-6 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[2rem] sm:pt-6"
+        className="animate-sheet max-h-[94dvh] w-full max-w-lg min-w-0 overflow-x-hidden overflow-y-auto rounded-t-[2rem] border border-line bg-card px-6 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[2rem] sm:pt-6"
       >
         <div aria-hidden className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-line sm:hidden" />
         <div className="mb-5 flex items-center justify-between gap-4">

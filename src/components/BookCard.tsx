@@ -25,12 +25,14 @@ export function BookCard({
   index,
   onToggleRead,
   onDelete,
+  onLocate,
 }: {
   book: Book;
   query: string;
   index: number;
   onToggleRead: (book: Book) => void;
   onDelete: (book: Book) => void;
+  onLocate: (book: Book) => void;
 }) {
   const color = spineColor(book.title);
   return (
@@ -64,17 +66,27 @@ export function BookCard({
           )}
         </div>
 
-        {/* Where to find it */}
-        <div className="brass mt-4 grid grid-cols-2 overflow-hidden rounded-xl" aria-label={`Rafti ${book.shelf}, vendi ${book.position}`}>
-          <div className="px-4 py-2 text-center">
-            <div className="text-xs font-bold tracking-[0.18em] opacity-75">RAFTI</div>
-            <div className="font-serif text-4xl leading-none font-bold">{book.shelf}</div>
-          </div>
-          <div className="border-l border-[color:var(--brass-ink)]/20 px-4 py-2 text-center">
-            <div className="text-xs font-bold tracking-[0.18em] opacity-75">VENDI</div>
-            <div className="font-serif text-4xl leading-none font-bold">{book.position}</div>
-          </div>
-        </div>
+        {/* Where to find it — tap to see it on the photos */}
+        <button
+          type="button"
+          onClick={() => onLocate(book)}
+          aria-label={`Rafti ${book.shelf}, vendi ${book.position}. Shiko ku është`}
+          className="brass mt-4 block w-full overflow-hidden rounded-xl text-left active:scale-[0.99]"
+        >
+          <span className="grid grid-cols-2">
+            <span className="px-4 py-2 text-center">
+              <span className="block text-xs font-bold tracking-[0.18em] opacity-75">RAFTI</span>
+              <span className="block font-serif text-4xl leading-none font-bold">{book.shelf}</span>
+            </span>
+            <span className="border-l border-[color:var(--brass-ink)]/20 px-4 py-2 text-center">
+              <span className="block text-xs font-bold tracking-[0.18em] opacity-75">VENDI</span>
+              <span className="block font-serif text-4xl leading-none font-bold">{book.position}</span>
+            </span>
+          </span>
+          <span className="flex items-center justify-center gap-1.5 border-t border-[color:var(--brass-ink)]/20 bg-black/5 py-1.5 text-base font-bold">
+            📍 Shiko ku është
+          </span>
+        </button>
 
         <div className="mt-3 flex items-center gap-2">
           <button
