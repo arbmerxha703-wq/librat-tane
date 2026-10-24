@@ -4,6 +4,7 @@ import type { Book } from "@/lib/types";
 import { matchRanges } from "@/lib/normalize";
 import { spineColor } from "@/lib/client";
 import { CheckIcon, TrashIcon } from "./icons";
+import { SpineThumb } from "./SpineThumb";
 
 export function Highlight({ text, query }: { text: string; query: string }) {
   const ranges = matchRanges(text, query);
@@ -26,10 +27,13 @@ export function BookCard({
   onToggleRead,
   onDelete,
   onLocate,
+  photoUrl,
 }: {
   book: Book;
   query: string;
   index: number;
+  /** Link to the shelf photo this book was scanned from, if any. */
+  photoUrl?: string | null;
   onToggleRead: (book: Book) => void;
   onDelete: (book: Book) => void;
   onLocate: (book: Book) => void;
@@ -67,26 +71,43 @@ export function BookCard({
         </div>
 
         {/* Where to find it — tap to see it on the photos */}
-        <button
-          type="button"
-          onClick={() => onLocate(book)}
-          aria-label={`Rafti ${book.shelf}, vendi ${book.position}. Shiko ku është`}
-          className="brass mt-4 block w-full overflow-hidden rounded-xl text-left active:scale-[0.99]"
-        >
-          <span className="grid grid-cols-2">
-            <span className="px-4 py-2 text-center">
-              <span className="block text-xs font-bold tracking-[0.18em] opacity-75">RAFTI</span>
-              <span className="block font-serif text-4xl leading-none font-bold">{book.shelf}</span>
+        {photoUrl && book.x0 != null && book.x1 != null ? (
+          <button
+            type="button"
+            onClick={() => onLocate(book)}
+            aria-label={`Shiko ku është: rafti ${book.shelf}`}
+            className="mt-4 block w-full overflow-hidden rounded-xl border border-line text-left active:scale-[0.99]"
+          >
+            <SpineThumb url={photoUrl} x0={book.x0} x1={book.x1} />
+            <span className="brass flex items-center justify-between gap-2 px-4 py-2.5">
+              <span className="text-lg font-bold">📍 Shiko ku është</span>
+              <span className="text-sm font-semibold opacity-75">
+                Rafti {book.shelf} · i {book.position}-ti
+              </span>
             </span>
-            <span className="border-l border-[color:var(--brass-ink)]/20 px-4 py-2 text-center">
-              <span className="block text-xs font-bold tracking-[0.18em] opacity-75">VENDI</span>
-              <span className="block font-serif text-4xl leading-none font-bold">{book.position}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onLocate(book)}
+            aria-label={`Rafti ${book.shelf}, vendi ${book.position}. Shiko ku është`}
+            className="brass mt-4 block w-full overflow-hidden rounded-xl text-left active:scale-[0.99]"
+          >
+            <span className="grid grid-cols-2">
+              <span className="px-4 py-2 text-center">
+                <span className="block text-xs font-bold tracking-[0.18em] opacity-75">RAFTI</span>
+                <span className="block font-serif text-4xl leading-none font-bold">{book.shelf}</span>
+              </span>
+              <span className="border-l border-[color:var(--brass-ink)]/20 px-4 py-2 text-center">
+                <span className="block text-xs font-bold tracking-[0.18em] opacity-75">VENDI</span>
+                <span className="block font-serif text-4xl leading-none font-bold">{book.position}</span>
+              </span>
             </span>
-          </span>
-          <span className="flex items-center justify-center gap-1.5 border-t border-[color:var(--brass-ink)]/20 bg-black/5 py-1.5 text-base font-bold">
-            📍 Shiko ku është
-          </span>
-        </button>
+            <span className="flex items-center justify-center gap-1.5 border-t border-[color:var(--brass-ink)]/20 bg-black/5 py-1.5 text-base font-bold">
+              📍 Shiko ku është
+            </span>
+          </button>
+        )}
 
         <div className="mt-3 flex items-center gap-2">
           <button

@@ -22,7 +22,15 @@ export interface Store {
   setMap(map: LibraryMap): Promise<void>;
 }
 
-const EMPTY_MAP: LibraryMap = { path: null, marks: {} };
+const EMPTY_MAP: LibraryMap = { zones: [] };
+
+/** Reads the stored map, upgrading the earlier single-photo shape { path, marks }. */
+function toMap(value: unknown): LibraryMap {
+  const v = value as { zones?: LibraryMap["zones"]; path?: string | null; marks?: LibraryMap["zones"][number]["marks"] } | null;
+  if (v?.zones) return { zones: v.zones };
+  if (v?.path) return { zones: [{ id: "biblioteka", name: "Biblioteka", path: v.path, marks: v.marks ?? {} }] };
+  return EMPTY_MAP;
+}
 
 class SupabaseStore implements Store {
   constructor(private db: SupabaseClient) {}
@@ -82,7 +90,7 @@ class SupabaseStore implements Store {
   async getMap() {
     const { data, error } = await this.db.from(SETTINGS).select("value").eq("key", "map").maybeSingle();
     if (error) throw error;
-    return { ...EMPTY_MAP, ...(data?.value as LibraryMap | undefined) };
+    return toMap(data?.value);
   }
 
   async setMap(map: LibraryMap) {
@@ -146,7 +154,7 @@ class MemoryStore implements Store {
   }
 
   async getMap() {
-    return this.map;
+    return toMap(this.map);
   }
 
   async setMap(map: LibraryMap) {

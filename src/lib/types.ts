@@ -25,8 +25,13 @@ export type NewBook = {
   x1?: number | null;
 };
 
-/** One photo of the whole bookcase, with a mark (0–1 of width/height) for each shelf. */
-export type LibraryMap = {
-  path: string | null;
+/** A photo of (part of) the library, with a mark (0–1 of width/height) for each shelf on it. */
+export type Zone = {
+  id: string;
+  name: string;
+  path: string;
   marks: Record<string, { x: number; y: number }>;
 };
+
+/** The big library can need several photos ("zones"), e.g. one per wall. */
+export type LibraryMap = { zones: Zone[] };

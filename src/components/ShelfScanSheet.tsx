@@ -6,7 +6,7 @@ import { normalize } from "@/lib/normalize";
 import { api, ApiError, booksLabel, getLastShelf, nextPosition, prepareShelfPhoto, saveLastShelf } from "@/lib/client";
 import { Modal } from "./Modal";
 import { ShelfPhoto } from "./ShelfPhoto";
-import { LibraryMap } from "./LibraryMap";
+import { ShelfPicker } from "./LibraryMap";
 import { CameraIcon, CheckIcon, CloseIcon, MinusIcon, PlusIcon, ShelvesIcon } from "./icons";
 
 type Draft = { key: number; title: string; author: string; x0: number | null; x1: number | null; readable: boolean };
@@ -34,15 +34,14 @@ export function ShelfScanSheet({
   onClose: () => void;
 }) {
   const [step, setStep] = useState<Step>("setup");
-  // Start on the last shelf used on this phone, else the first shelf in the catalog, else shelf 1.
-  const [shelf, setShelf] = useState(() => getLastShelf() || shelves[0] || "1");
-  const [startPos, setStartPos] = useState(() => nextPosition(books, getLastShelf() || shelves[0] || "1"));
+  // Start on the last shelf used on this phone; otherwise the shelf is picked on the library photo.
+  const [shelf, setShelf] = useState(getLastShelf);
+  const [startPos, setStartPos] = useState(() => nextPosition(books, getLastShelf()));
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [photo, setPhoto] = useState<{ path: string | null; url: string | null }>({ path: null, url: null });
   const [waitSeconds, setWaitSeconds] = useState(0);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [showMap, setShowMap] = useState(false);
   const [lastSaved, setLastSaved] = useState<{ count: number; from: number; to: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const nextKey = useRef(0);
@@ -192,131 +191,109 @@ export function ShelfScanSheet({
 
       {step === "setup" && (
         <div className="flex flex-col gap-6">
-          <ol className="flex flex-col gap-3 text-lg">
-            {[
-              "Zgjidhni numrin e raftit.",
-              "Qëndroni përballë raftit dhe bëni foto, që të shihen mirë shpinat e librave.",
-              "Kontrolloni librat që gjeti aplikacioni, pastaj prekni “Ruaj”.",
-            ].map((text, i) => (
-              <li key={i} className="flex gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-base font-bold text-accent-ink">
-                  {i + 1}
-                </span>
-                <span>{text}</span>
-              </li>
-            ))}
-          </ol>
+          <section className="flex flex-col gap-3">
+            <h3 className="flex items-center gap-3 text-xl font-bold">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-lg text-accent-ink">1</span>
+              Ku është rafti?
+            </h3>
+            <ShelfPicker passcode={passcode} shelves={shelves} shelf={shelf} onPick={changeShelf} />
 
-          <div className="brass rounded-2xl p-4">
-            <label htmlFor="scan-shelf" className="mb-2 block text-lg font-semibold">
-              Rafti
-            </label>
-            {shelves.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Raftet ekzistuese">
-                {shelves.map((s) => {
-                  const active = normalize(s) === normalize(shelf);
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => changeShelf(s)}
-                      aria-pressed={active}
-                      className={`h-12 min-w-12 rounded-xl px-4 text-xl font-bold ${
-                        active ? "bg-[color:var(--brass-ink)] text-[color:var(--brass-1)]" : "bg-white/55 hover:bg-white/80"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  );
-                })}
+            <details className="rounded-2xl border border-line bg-soft/40 px-4 py-3">
+              <summary className="cursor-pointer text-base font-semibold text-muted">Ose zgjidhni raftin me numër</summary>
+              <div className="brass mt-3 rounded-2xl p-4">
+                {shelves.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Raftet ekzistuese">
+                    {shelves.map((s) => {
+                      const active = normalize(s) === normalize(shelf);
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => changeShelf(s)}
+                          aria-pressed={active}
+                          className={`h-12 min-w-12 rounded-xl px-4 text-xl font-bold ${
+                            active ? "bg-[color:var(--brass-ink)] text-[color:var(--brass-1)]" : "bg-white/55 hover:bg-white/80"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <input
+                  id="scan-shelf"
+                  value={shelf}
+                  onChange={(e) => changeShelf(e.target.value)}
+                  placeholder={shelves.length ? "ose shkruani një raft të ri" : "p.sh. 1"}
+                  aria-label="Rafti"
+                  autoComplete="off"
+                  className="h-14 w-full rounded-xl border-2 border-transparent bg-white/70 px-4 text-xl text-[#33241a] outline-none placeholder:text-[#33241a]/50 focus:border-[color:var(--brass-ink)]"
+                />
               </div>
-            )}
-            <input
-              id="scan-shelf"
-              value={shelf}
-              onChange={(e) => changeShelf(e.target.value)}
-              placeholder={shelves.length ? "ose shkruani një raft të ri" : "p.sh. 1"}
-              autoComplete="off"
-              className="h-14 w-full rounded-xl border-2 border-transparent bg-white/70 px-4 text-xl text-[#33241a] outline-none placeholder:text-[#33241a]/50 focus:border-[color:var(--brass-ink)]"
-            />
-
-            <p className="mt-4 mb-2 text-lg font-semibold">Libri i parë në foto është në vendin</p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setStartPos((p) => Math.max(1, p - 1))}
-                aria-label="Një vend më pak"
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/55 hover:bg-white/80"
-              >
-                <MinusIcon className="h-7 w-7" />
-              </button>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                value={startPos}
-                onChange={(e) => setStartPos(Math.max(1, Number(e.target.value) || 1))}
-                aria-label="Vendi i librit të parë"
-                className="h-14 w-full min-w-0 rounded-xl border-2 border-transparent bg-white/70 text-center font-serif text-3xl font-bold text-[#33241a] outline-none focus:border-[color:var(--brass-ink)]"
-              />
-              <button
-                type="button"
-                onClick={() => setStartPos((p) => p + 1)}
-                aria-label="Një vend më shumë"
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/55 hover:bg-white/80"
-              >
-                <PlusIcon className="h-7 w-7" />
-              </button>
-            </div>
-          </div>
+            </details>
+          </section>
 
           {shelf.trim() && (
-            <div className="rounded-2xl border border-line bg-soft/50 p-4">
-              <button
-                type="button"
-                onClick={() => setShowMap((v) => !v)}
-                aria-expanded={showMap}
-                className="flex w-full items-center justify-between gap-3 text-left text-lg font-semibold"
-              >
-                <span>📍 Ku ndodhet Rafti {shelf} në bibliotekë?</span>
-                <span className="text-muted">{showMap ? "▲" : "▼"}</span>
-              </button>
-              {showMap ? (
-                <div className="mt-3">
-                  <LibraryMap passcode={passcode} shelf={shelf.trim()} editable />
+            <section className="flex flex-col gap-3">
+              <h3 className="flex items-center gap-3 text-xl font-bold">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-lg text-accent-ink">2</span>
+                Bëj foto raftit
+              </h3>
+              <p className="rounded-xl bg-soft px-4 py-3 text-base text-muted">
+                Qëndroni <strong className="text-ink">drejt përballë</strong> raftit, rreth <strong className="text-ink">15 libra</strong>{" "}
+                në një foto, me dritë të mirë. Raft i gjatë? Fotografojeni pjesë-pjesë, nga e majta në të djathtë.
+              </p>
+
+              <details className="text-base text-muted">
+                <summary className="cursor-pointer">
+                  Libri i parë në foto ruhet si i <strong className="text-ink">{startPos}-ti</strong> në raftin {shelf}{" "}
+                  <span className="underline">(ndrysho)</span>
+                </summary>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStartPos((p) => Math.max(1, p - 1))}
+                    aria-label="Një vend më pak"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-soft"
+                  >
+                    <MinusIcon className="h-6 w-6" />
+                  </button>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    value={startPos}
+                    onChange={(e) => setStartPos(Math.max(1, Number(e.target.value) || 1))}
+                    aria-label="Vendi i librit të parë"
+                    className="h-12 w-full min-w-0 rounded-xl border-2 border-line bg-bg text-center font-serif text-2xl font-bold outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setStartPos((p) => p + 1)}
+                    aria-label="Një vend më shumë"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-soft"
+                  >
+                    <PlusIcon className="h-6 w-6" />
+                  </button>
                 </div>
-              ) : (
-                <p className="mt-1 text-base text-muted">
-                  Opsionale: shënojeni në foton e bibliotekës, që ta gjeni pa numëruar rafte.
+              </details>
+
+              {error && (
+                <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-lg text-danger">
+                  {error}
                 </p>
               )}
-            </div>
-          )}
 
-          <p className="rounded-xl bg-soft px-4 py-3 text-base text-muted">
-            <strong className="text-ink">Këshillë:</strong> fotografoni rreth <strong>15 libra</strong> njëherësh, nga e
-            majta në të djathtë, me dritë të mirë. Afrohuni aq sa titujt të lexohen.
-          </p>
-
-          {error && (
-            <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-lg text-danger">
-              {error}
-            </p>
-          )}
-
-          {shelf.trim() ? (
-            <label
-              htmlFor={PHOTO_INPUT_ID}
-              onClick={() => setError("")}
-              className="flex h-18 cursor-pointer items-center justify-center gap-3 rounded-2xl bg-accent text-2xl font-bold text-accent-ink shadow-md active:scale-[0.99]"
-            >
-              <CameraIcon className="h-8 w-8" />
-              Bëj foto raftit
-            </label>
-          ) : (
-            <p className="rounded-2xl border-2 border-dashed border-line px-4 py-5 text-center text-lg text-muted">
-              Zgjidhni ose shkruani numrin e raftit më sipër, pastaj bëni foton.
-            </p>
+              <label
+                htmlFor={PHOTO_INPUT_ID}
+                onClick={() => setError("")}
+                className="flex h-18 cursor-pointer items-center justify-center gap-3 rounded-2xl bg-accent text-2xl font-bold text-accent-ink shadow-md active:scale-[0.99]"
+              >
+                <CameraIcon className="h-8 w-8" />
+                Bëj foto raftit
+              </label>
+            </section>
           )}
         </div>
       )}

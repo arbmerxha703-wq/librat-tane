@@ -4,14 +4,14 @@ A home-library catalog for phones. Type part of a title or author and the app
 tells you exactly where the book is: **Rafti 3 · Vendi 5** (shelf 3, position 5).
 
 - Search ignores capitals and accents (`ceshtja` finds *Çështja*), and matches partial words.
-- **Photograph a whole shelf** and the AI (Groq, free — or Claude) reads every spine left to right, numbering the positions for you —
+- **Photograph a whole shelf** and the AI (Gemini or Groq, both free — or Claude) reads every spine left to right, numbering the positions for you —
   the fast way to catalogue 100+ books (a few photos instead of typing each book).
 - Or add a single book by hand / by photographing its cover.
 - Filters: Të gjitha / Lexuar / Pa lexuar, and a "Sipas rafteve" (by shelf) view.
 - One shared catalog for every device, protected by a single shared passcode (no accounts).
 - Large text and buttons, light and dark mode, all UI in Albanian.
 
-Stack: Next.js (App Router) · TypeScript · Tailwind CSS · Supabase (Postgres) · Groq or Claude (vision) · Vercel.
+Stack: Next.js (App Router) · TypeScript · Tailwind CSS · Supabase (Postgres) · Gemini / Groq / Claude (vision) · Vercel.
 
 ---
 
@@ -76,12 +76,14 @@ Copy `.env.example` to `.env.local` and fill it in:
 | `APP_PASSCODE` | The shared code the family types once on each phone (e.g. a 4–6 digit number). |
 | `SUPABASE_URL` | Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key (server-side only). |
-| `GROQ_API_KEY` | **Free** photo reading (shelf and cover scans). From [console.groq.com](https://console.groq.com) → API Keys. |
+| `GEMINI_API_KEY` | **Free**, recommended photo reading (reads small spine print best). From [aistudio.google.com](https://aistudio.google.com) → Get API key. |
+| `GEMINI_MODEL` | Optional. Default `gemini-3.8-flash`. |
+| `GROQ_API_KEY` | Free alternative ([console.groq.com](https://console.groq.com) → API Keys). Finds books well but misreads more titles. |
 | `GROQ_MODEL` | Optional. Groq vision model, default `qwen/qwen3.8-27b`. |
-| `ANTHROPIC_API_KEY` | Optional, paid alternative: Claude reads photos when `GROQ_API_KEY` is empty. |
+| `ANTHROPIC_API_KEY` | Optional, paid alternative (Claude). |
 
-Photo reading uses Groq when `GROQ_API_KEY` is set, otherwise Claude. Without either, everything works except the photo buttons.
-Groq's free tier has rate limits; if one is hit the app says so and you can retry a few minutes later.
+Photo reading uses the first of Gemini, Groq, Claude that has a key. Without any, everything works except the photo buttons.
+Free tiers have rate limits (Groq: about one shelf photo a minute); when one is hit the app waits and retries by itself.
 
 If `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` are missing **in development**, the app falls back to an
 in-memory catalog (lost on restart) so you can try it without a database. In production they are required.
@@ -100,18 +102,24 @@ example books. Remove them any time with **Hiq librat shembull** — your own bo
 
 1. Push this folder to a GitHub repository.
 2. In Vercel: **Add New → Project**, import the repository (framework is detected automatically).
-3. Under **Environment Variables**, add `APP_PASSCODE`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `GROQ_API_KEY`.
+3. Under **Environment Variables**, add `APP_PASSCODE`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` (or `GROQ_API_KEY`).
 4. Click **Deploy**. Open the URL on each phone, and use the browser's **Add to Home Screen** so it opens like an app.
 
 ## Cataloguing a big library quickly
 
-1. Tap **Foto e raftit**, pick the shelf number (and the position of the first book in the photo — usually 1).
-2. Stand in front of the shelf and take a photo where the spines are readable. For long shelves, photograph
-   about 15–20 books at a time, left to right.
-3. Check the list: fix any title, type the ones marked "nuk u lexua" (unreadable) or remove them with ×.
-   Removing a book keeps the other positions unchanged, so numbers always match the real shelf.
-   Titles already in the catalogue are flagged so you don't add them twice.
-4. Tap **Ruaj**. Then **Vazhdo këtë raft** to photograph the next part (numbering continues), or **Raft tjetër**.
+Nobody has to count or remember shelf numbers:
+
+1. Tap **Foto e raftit**. The first time, photograph the library (for a big one, add a photo per wall —
+   “Muri majtas”, “Te dritarja”…).
+2. **Tap the shelf on that photo.** Tapping an existing mark continues that shelf; tapping a new spot creates
+   the next shelf there.
+3. Stand in front of the shelf and photograph about 15 books at a time, left to right.
+4. Check the list against the photo: every found book has a number on it. Fix titles, use **+ Shto libër këtu**
+   for a missed one, × for something that isn't a book. Positions renumber themselves.
+5. Tap **Ruaj**, then **Vazhdo këtë raft** for the next part of the shelf, or **Raft tjetër**.
+
+Finding a book: search, and each result shows a close-up of its spine from the shelf photo. **Shiko ku është**
+shows the library photo with a red circle on the shelf, and the shelf photo with the book lit up.
 
 ## How it works
 
@@ -120,7 +128,7 @@ example books. Remove them any time with **Hiq librat shembull** — your own bo
   - `books` — list / add, `books/[id]` — mark read / delete, `samples` — add or remove the example books,
     `books/bulk` — saves many books at once, `scan-shelf` — sends a shelf photo to Claude and returns the books
     in left-to-right order, `scan` — reads a single cover and returns `{ title, author }`, `auth` — checks a passcode.
-- `src/lib/vision.ts` — sends a photo to Groq (OpenAI-compatible chat API, JSON mode) or Claude (`claude-opus-5-5`,
+- `src/lib/vision.ts` — sends photos to Gemini (`generateContent`), Groq (OpenAI-compatible chat API) or Claude (`claude-opus-5-5`,
   structured output) and validates the JSON with zod.
 - `src/components/Library.tsx` — the main screen. The whole catalog is loaded once and searched in the browser,
   so results appear instantly as you type. It refreshes when the app is reopened, to pick up books added on another phone.

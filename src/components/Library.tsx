@@ -27,6 +27,8 @@ export function Library() {
   const [scanningShelf, setScanningShelf] = useState(false);
   const [toDelete, setToDelete] = useState<Book | null>(null);
   const [locating, setLocating] = useState<Book | null>(null);
+  // Short-lived links to shelf photos, for the close-ups on the book cards.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [removingSamples, setRemovingSamples] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
@@ -91,6 +93,37 @@ export function Library() {
       ? list.sort(compareByLocation)
       : list.sort((a, b) => a.title.localeCompare(b.title, "sq", { sensitivity: "base" }));
   }, [books, filter, query, byShelf]);
+
+  // Fetch links for the shelf photos of the books on screen (first 60), 20 at a time.
+  const missingPaths = useMemo(
+    () =>
+      [...new Set(visible.slice(0, 60).map((b) => b.photo_path).filter((p): p is string => !!p))].filter(
+        (p) => !(p in photoUrls),
+      ),
+    [visible, photoUrls],
+  );
+  useEffect(() => {
+    if (!passcode || missingPaths.length === 0) return;
+    let alive = true;
+    const batches = [];
+    for (let i = 0; i < missingPaths.length; i += 20) batches.push(missingPaths.slice(i, i + 20));
+    Promise.all(
+      batches.map((paths) =>
+        api<{ urls: Record<string, string> }>("/api/photos", passcode, { method: "POST", body: JSON.stringify({ paths }) }),
+      ),
+    ).then(
+      (results) => {
+        if (!alive) return;
+        // Paths with no link (e.g. a deleted photo) are remembered as "" so they aren't asked for again.
+        const found = Object.assign({}, ...results.map((r) => r.urls));
+        setPhotoUrls((prev) => ({ ...prev, ...Object.fromEntries(missingPaths.map((p) => [p, found[p] ?? ""])) }));
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, [missingPaths, passcode]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Book[]>();
@@ -313,12 +346,12 @@ export function Library() {
                         {booksLabel(list.length)}
                       </span>
                     </h2>
-                    <BookList books={list} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} />
+                    <BookList books={list} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} photoUrls={photoUrls} />
                   </section>
                 ))}
               </div>
             ) : (
-              <BookList books={visible} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} />
+              <BookList books={visible} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} photoUrls={photoUrls} />
             )}
           </>
         )}
@@ -437,12 +470,14 @@ function BookList({
   onToggleRead,
   onDelete,
   onLocate,
+  photoUrls,
 }: {
   books: Book[];
   query: string;
   onToggleRead: (b: Book) => void;
   onDelete: (b: Book) => void;
   onLocate: (b: Book) => void;
+  photoUrls: Record<string, string>;
 }) {
   return (
     <ul className="flex flex-col gap-4">
@@ -455,6 +490,7 @@ function BookList({
           onToggleRead={onToggleRead}
           onDelete={onDelete}
           onLocate={onLocate}
+          photoUrl={b.photo_path ? photoUrls[b.photo_path] || null : null}
         />
       ))}
     </ul>

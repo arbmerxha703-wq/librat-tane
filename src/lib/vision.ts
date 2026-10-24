@@ -3,7 +3,6 @@ import Anthropic from "@anthropic-ai/sdk";
 
 /**
  * Sends one or more photos with a prompt and returns the model's text reply.
- * Uses Groq (free tier) when GROQ_API_KEY is set, otherwise Claude when ANTHROPIC_API_KEY is set.
  */
 
 export class VisionError extends Error {
@@ -21,10 +20,67 @@ export type VisionImage = { data: string; mediaType: "image/jpeg" | "image/png" 
 
 type Request = { images: VisionImage[]; prompt: string; maxTokens: number };
 
+/**
+ * Order of preference: Gemini (free, reads small print best), then Groq (free, weaker at reading),
+ * then Claude (paid).
+ */
 export async function readImages(req: Request): Promise<string> {
+  if (process.env.GEMINI_API_KEY) return readWithGemini(req);
   if (process.env.GROQ_API_KEY) return readWithGroq(req);
   if (process.env.ANTHROPIC_API_KEY) return readWithClaude(req);
-  throw new VisionError("Leximi i fotove nuk është aktivizuar (mungon GROQ_API_KEY).", 503);
+  throw new VisionError("Leximi i fotove nuk është aktivizuar (mungon GEMINI_API_KEY).", 503);
+}
+
+const GEMINI_DEFAULT_MODEL = "gemini-3.8-flash";
+
+function rateLimited(seconds: number): VisionError {
+  return new VisionError(
+    "U arrit kufiri falas i leximit të fotove. Po pres pak dhe provoj përsëri.",
+    429,
+    Math.ceil(Math.min(Math.max(seconds, 3), 90)),
+  );
+}
+
+async function readWithGemini(req: Request): Promise<string> {
+  const model = process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL;
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": process.env.GEMINI_API_KEY!, "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            ...req.images.map((img) => ({ inline_data: { mime_type: img.mediaType, data: img.data } })),
+            { text: req.prompt },
+          ],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        // Leave room for the model's thinking as well as the list itself.
+        maxOutputTokens: Math.max(req.maxTokens, 16000),
+        responseMimeType: "application/json",
+        mediaResolution: "MEDIA_RESOLUTION_HIGH",
+      },
+    }),
+  });
+
+  if (res.status === 429) {
+    const body = await res.json().catch(() => null);
+    const delay = (body?.error?.details as { retryDelay?: string }[] | undefined)?.find((d) => d.retryDelay)?.retryDelay;
+    throw rateLimited(Number.parseFloat(delay ?? "30"));
+  }
+  if (!res.ok) {
+    console.error("[gemini]", res.status, await res.text().catch(() => ""));
+    throw new VisionError("Leximi i fotos dështoi. Provoni përsëri.", 502);
+  }
+  const body = await res.json();
+  const parts: { text?: string; thought?: boolean }[] = body?.candidates?.[0]?.content?.parts ?? [];
+  return parts
+    .filter((p) => !p.thought)
+    .map((p) => p.text ?? "")
+    .join("");
 }
 
 /** Pulls the JSON value out of a reply that may be wrapped in code fences or extra text. */
@@ -75,12 +131,7 @@ async function readWithGroq(req: Request): Promise<string> {
   if (res.status === 429) {
     const body = await res.json().catch(() => null);
     const message: string = body?.error?.message ?? "";
-    const seconds = Number(/try again in ([\d.]+)s/.exec(message)?.[1] ?? res.headers.get("retry-after") ?? 30);
-    throw new VisionError(
-      "U arrit kufiri falas i leximit të fotove. Po pres pak dhe provoj përsëri.",
-      429,
-      Math.ceil(Math.min(Math.max(seconds, 3), 90)),
-    );
+    throw rateLimited(Number(/try again in ([\d.]+)s/.exec(message)?.[1] ?? res.headers.get("retry-after") ?? 30));
   }
   if (!res.ok) {
     console.error("[groq]", res.status, await res.text().catch(() => ""));
