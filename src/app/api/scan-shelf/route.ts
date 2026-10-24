@@ -26,6 +26,7 @@ export async function POST(req: Request) {
       images: tiles.map((t) => ({ data: t.image, mediaType: "image/jpeg" as const })),
       prompt: SHELF_PROMPT,
       maxTokens: 950,
+      patienceMs: 25_000,
     });
     const books = mergeTiles(extractTileRows(reply), tiles.map((t) => t.widthFrac));
     if (books.length === 0) {

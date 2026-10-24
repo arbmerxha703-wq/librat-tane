@@ -12,14 +12,14 @@ For EACH photo separately, list EVERY book you can see in that photo, from left 
 - Include books cut off at the left or right edge of a photo.
 - Spine text is rotated. Read along the spine and keep the words in the printed order.
 - If what you read matches a real published book, write its correct official title and author.
-- Keep Albanian accents (ë, ç). Normal capitalization ("Kronikë në gur", not "KRONIKË NË GUR").
+- Keep Albanian accents (ë, ç). Write titles in normal sentence capitalization, not ALL CAPS.
 - Leave out publishers, series names and volume numbers.
 - If you see a book but cannot read its title, still include it with title "".
 - Ignore objects that are not books.
 
 Write each book as [title, author, left, right]: author "" if not shown and not sure; left/right = edges of the spine in THAT photo, whole numbers 0 to 1000 of the photo width.
-Reply with ONLY this JSON object (one list per photo), no other text:
-{"p":[[["Kronikë në gur","Ismail Kadare",120,160]],[],[]]}`;
+Only list books that are really in the photos. Reply with ONLY a JSON object of this shape (one list per photo), no other text:
+{"p":[[["<title>","<author>",<left>,<right>], ...], [...], [...]]}`;
 
 export type ScannedBook = { title: string; author: string; x0: number | null; x1: number | null };
 

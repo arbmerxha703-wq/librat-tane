@@ -18,21 +18,35 @@ export class VisionError extends Error {
 
 export type VisionImage = { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }; // base64, no prefix
 
-type Request = { images: VisionImage[]; prompt: string; maxTokens: number };
+type Request = {
+  images: VisionImage[];
+  prompt: string;
+  maxTokens: number;
+  /** How long to wait for the best (slower) Gemini model before switching to the fast one. */
+  patienceMs: number;
+};
 
 /**
- * Order of preference: Gemini (free, reads small print best), then Groq (free, weaker at reading),
- * then Claude (paid).
+ * Order of preference, each one taking over when the previous is slow, busy or failing:
+ * Gemini Flash (free, reads every title right but can be slow when Google is busy),
+ * Gemini Flash-Lite (free and fast, occasionally adds a book that isn't there),
+ * Groq (free, misreads more titles), Claude (paid).
  */
 export async function readImages(req: Request): Promise<string> {
   if (process.env.GEMINI_API_KEY) {
-    try {
-      return await readWithGemini(req);
-    } catch (err) {
-      // Gemini busy or over its free limit: a weaker reading now beats making grandparents wait.
-      if (!(err instanceof VisionError) || !process.env.GROQ_API_KEY) throw err;
-      console.warn("[vision] Gemini unavailable, falling back to Groq:", err.message);
+    const models = [
+      { model: process.env.GEMINI_MODEL || "gemini-3.8-flash", timeoutMs: req.patienceMs },
+      { model: process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite", timeoutMs: 30_000 },
+    ];
+    for (const { model, timeoutMs } of models) {
+      try {
+        return await readWithGemini(req, model, timeoutMs);
+      } catch (err) {
+        if (!(err instanceof VisionError)) throw err;
+        console.warn(`[vision] ${model} unavailable:`, err.message);
+      }
     }
+    if (!process.env.GROQ_API_KEY) throw new VisionError("Leximi i fotos dështoi. Provoni përsëri.", 502);
   }
   if (process.env.GROQ_API_KEY) return readWithGroq(req);
   if (process.env.ANTHROPIC_API_KEY) return readWithClaude(req);
@@ -63,10 +77,8 @@ function rateLimited(seconds: number): VisionError {
   );
 }
 
-const GEMINI_DEFAULT_MODEL = "gemini-3.8-flash";
-
-async function readWithGemini(req: Request): Promise<string> {
-  const model = process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL;
+async function readWithGemini(req: Request, model: string, timeoutMs: number): Promise<string> {
+  const deadline = AbortSignal.timeout(timeoutMs);
   const payload = JSON.stringify({
     contents: [
       {
@@ -92,12 +104,16 @@ async function readWithGemini(req: Request): Promise<string> {
       method: "POST",
       headers: { "x-goog-api-key": process.env.GEMINI_API_KEY!, "content-type": "application/json" },
       body: payload,
+      signal: deadline,
+    }).catch((err) => {
+      if (deadline.aborted) throw new VisionError(`no reply within ${timeoutMs / 1000}s`, 504);
+      throw new VisionError(`network error: ${(err as Error).message}`, 502);
     });
 
-  // "High demand" (503) spells are usually short: try a couple more times before giving up.
+  // "High demand" (503) spells are usually short: try once more before handing over.
   let res = await call();
-  for (let attempt = 1; res.status === 503 && attempt <= 2; attempt++) {
-    await sleep(1500 * attempt);
+  if (res.status === 503 && !deadline.aborted) {
+    await sleep(1500);
     res = await call();
   }
 
@@ -110,7 +126,9 @@ async function readWithGemini(req: Request): Promise<string> {
     console.error("[gemini]", res.status, await res.text().catch(() => ""));
     throw new VisionError("Leximi i fotos dështoi. Provoni përsëri.", 502);
   }
-  const body = await res.json();
+  const body = await res.json().catch(() => {
+    throw new VisionError(`no reply within ${timeoutMs / 1000}s`, 504);
+  });
   const parts: { text?: string; thought?: boolean }[] = body?.candidates?.[0]?.content?.parts ?? [];
   return parts
     .filter((p) => !p.thought)
