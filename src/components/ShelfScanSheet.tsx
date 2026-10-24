@@ -1,0 +1,394 @@
+"use client";
+
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { Book, NewBook } from "@/lib/types";
+import { normalize } from "@/lib/normalize";
+import { api, booksLabel, getLastShelf, nextPosition, photoToBase64, saveLastShelf } from "@/lib/client";
+import { Modal } from "./Modal";
+import { CameraIcon, CheckIcon, CloseIcon, MinusIcon, PlusIcon, ShelvesIcon } from "./icons";
+
+type Draft = { key: number; position: number; title: string; author: string; readable: boolean };
+type Step = "setup" | "scanning" | "review" | "done";
+
+const PHOTO_INPUT_ID = "shelf-photo-input";
+
+export function ShelfScanSheet({
+  books,
+  shelves,
+  passcode,
+  onSaved,
+  onClose,
+}: {
+  books: Book[];
+  shelves: string[];
+  passcode: string;
+  onSaved: (books: Book[]) => void;
+  onClose: () => void;
+}) {
+  const [step, setStep] = useState<Step>("setup");
+  // Start on the last shelf used on this phone, else the first shelf in the catalog, else shelf 1.
+  const [shelf, setShelf] = useState(() => getLastShelf() || shelves[0] || "1");
+  const [startPos, setStartPos] = useState(() => nextPosition(books, getLastShelf() || shelves[0] || "1"));
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [scanCount, setScanCount] = useState(0);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<{ count: number; from: number; to: number } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Titles already in the catalog, to warn about photographing the same books twice.
+  const existing = useMemo(() => {
+    const map = new Map<string, Book>();
+    for (const b of books) map.set(normalize(b.title), b);
+    return map;
+  }, [books]);
+
+  function changeShelf(value: string) {
+    setShelf(value);
+    setStartPos(nextPosition(books, value));
+  }
+
+  async function scan(file: File | undefined) {
+    if (!file) return;
+    setStep("scanning");
+    setError("");
+    try {
+      const image = await photoToBase64(file, 2000);
+      const result = await api<{ books: { title: string; author: string; readable: boolean }[] }>(
+        "/api/scan-shelf",
+        passcode,
+        { method: "POST", body: JSON.stringify({ image, mediaType: "image/jpeg" }) },
+      );
+      setDrafts(result.books.map((b, i) => ({ ...b, key: i, position: startPos + i })));
+      setScanCount(result.books.length);
+      setStep("review");
+    } catch (err) {
+      setError((err as Error).message);
+      setStep("setup");
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  function updateDraft(key: number, patch: Partial<Draft>) {
+    setDrafts((list) => list.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+  }
+
+  async function saveAll() {
+    const missing = drafts.find((d) => !d.title.trim());
+    if (missing) {
+      setError(`Shkruani titullin e librit te vendi ${missing.position}, ose hiqeni me ×.`);
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const payload: NewBook[] = drafts.map((d) => ({
+        title: d.title.replace(/\s+/g, " ").trim(),
+        author: d.author.replace(/\s+/g, " ").trim(),
+        shelf: shelf.trim(),
+        position: d.position,
+        is_read: false,
+      }));
+      const { books: saved } = await api<{ books: Book[] }>("/api/books/bulk", passcode, {
+        method: "POST",
+        body: JSON.stringify({ books: payload }),
+      });
+      saveLastShelf(shelf.trim());
+      onSaved(saved);
+      // Positions stay as photographed even if some unreadable books were removed,
+      // so the next photo of this shelf continues after the last book in this one.
+      const lastPos = startPos + scanCount - 1;
+      setLastSaved({ count: saved.length, from: Math.min(...drafts.map((d) => d.position)), to: lastPos });
+      setStartPos(lastPos + 1);
+      setDrafts([]);
+      setStep("done");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const unreadable = drafts.filter((d) => !d.readable).length;
+
+  return (
+    <Modal title="Fotografo raftin" onClose={onClose}>
+      <input
+        ref={fileRef}
+        id={PHOTO_INPUT_ID}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(e) => scan(e.target.files?.[0])}
+      />
+
+      {error && step !== "setup" && (
+        <p role="alert" className="mb-5 rounded-xl bg-danger/10 px-4 py-3 text-lg text-danger">
+          {error}
+        </p>
+      )}
+
+      {step === "setup" && (
+        <div className="flex flex-col gap-6">
+          <ol className="flex flex-col gap-3 text-lg">
+            {[
+              "Zgjidhni numrin e raftit.",
+              "Qëndroni përballë raftit dhe bëni foto, që të shihen mirë shpinat e librave.",
+              "Kontrolloni titujt që lexoi aplikacioni, pastaj prekni “Ruaj”.",
+            ].map((text, i) => (
+              <li key={i} className="flex gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-base font-bold text-accent-ink">
+                  {i + 1}
+                </span>
+                <span>{text}</span>
+              </li>
+            ))}
+          </ol>
+
+          <div className="brass rounded-2xl p-4">
+            <label htmlFor="scan-shelf" className="mb-2 block text-lg font-semibold">
+              Rafti
+            </label>
+            {shelves.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Raftet ekzistuese">
+                {shelves.map((s) => {
+                  const active = normalize(s) === normalize(shelf);
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => changeShelf(s)}
+                      aria-pressed={active}
+                      className={`h-12 min-w-12 rounded-xl px-4 text-xl font-bold ${
+                        active ? "bg-[color:var(--brass-ink)] text-[color:var(--brass-1)]" : "bg-white/55 hover:bg-white/80"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <input
+              id="scan-shelf"
+              value={shelf}
+              onChange={(e) => changeShelf(e.target.value)}
+              placeholder={shelves.length ? "ose shkruani një raft të ri" : "p.sh. 1"}
+              autoComplete="off"
+              className="h-14 w-full rounded-xl border-2 border-transparent bg-white/70 px-4 text-xl text-[#33241a] outline-none placeholder:text-[#33241a]/50 focus:border-[color:var(--brass-ink)]"
+            />
+
+            <p className="mt-4 mb-2 text-lg font-semibold">Libri i parë në foto është në vendin</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStartPos((p) => Math.max(1, p - 1))}
+                aria-label="Një vend më pak"
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/55 hover:bg-white/80"
+              >
+                <MinusIcon className="h-7 w-7" />
+              </button>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={startPos}
+                onChange={(e) => setStartPos(Math.max(1, Number(e.target.value) || 1))}
+                aria-label="Vendi i librit të parë"
+                className="h-14 w-full min-w-0 rounded-xl border-2 border-transparent bg-white/70 text-center font-serif text-3xl font-bold text-[#33241a] outline-none focus:border-[color:var(--brass-ink)]"
+              />
+              <button
+                type="button"
+                onClick={() => setStartPos((p) => p + 1)}
+                aria-label="Një vend më shumë"
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/55 hover:bg-white/80"
+              >
+                <PlusIcon className="h-7 w-7" />
+              </button>
+            </div>
+          </div>
+
+          <p className="rounded-xl bg-soft px-4 py-3 text-base text-muted">
+            <strong className="text-ink">Këshillë:</strong> nëse rafti është i gjatë, fotografojeni pjesë-pjesë
+            (rreth 15–20 libra në një foto), nga e majta në të djathtë. Me dritë të mirë lexohet më saktë.
+          </p>
+
+          {error && (
+            <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-lg text-danger">
+              {error}
+            </p>
+          )}
+
+          {shelf.trim() ? (
+            <label
+              htmlFor={PHOTO_INPUT_ID}
+              onClick={() => setError("")}
+              className="flex h-18 cursor-pointer items-center justify-center gap-3 rounded-2xl bg-accent text-2xl font-bold text-accent-ink shadow-md active:scale-[0.99]"
+            >
+              <CameraIcon className="h-8 w-8" />
+              Bëj foto raftit
+            </label>
+          ) : (
+            <p className="rounded-2xl border-2 border-dashed border-line px-4 py-5 text-center text-lg text-muted">
+              Zgjidhni ose shkruani numrin e raftit më sipër, pastaj bëni foton.
+            </p>
+          )}
+        </div>
+      )}
+
+      {step === "scanning" && (
+        <div className="flex flex-col items-center gap-5 py-10 text-center" role="status">
+          <span className="flex h-20 w-20 animate-pulse items-center justify-center rounded-3xl bg-accent text-accent-ink">
+            <ShelvesIcon className="h-11 w-11" />
+          </span>
+          <p className="font-serif text-2xl font-bold">Duke lexuar shpinat e librave…</p>
+          <p className="text-lg text-muted">Kjo mund të zgjasë deri në një minutë. Mos e mbyllni ekranin.</p>
+        </div>
+      )}
+
+      {step === "review" && (
+        <div className="flex flex-col gap-4">
+          <div className="rounded-2xl bg-ok/10 px-4 py-3 text-lg text-ok">
+            U gjetën <strong>{booksLabel(drafts.length)}</strong> në Raftin {shelf}.
+            {unreadable > 0 && (
+              <span className="mt-1 block text-danger">
+                {unreadable === 1 ? "1 libër nuk u lexua" : `${unreadable} libra nuk u lexuan`} — shkruani titullin ose
+                hiqeni me ×.
+              </span>
+            )}
+          </div>
+          <p className="text-base text-muted">Kontrolloni titujt. Mund t’i ndryshoni duke prekur mbi to.</p>
+
+          <ul className="flex flex-col gap-3">
+            {drafts.map((d) => {
+              const dup = d.title.trim() ? existing.get(normalize(d.title)) : undefined;
+              return (
+                <li
+                  key={d.key}
+                  className={`flex gap-2 rounded-2xl border-2 bg-card p-2.5 ${
+                    d.readable ? "border-line" : "border-dashed border-danger/60"
+                  }`}
+                >
+                  <div className="brass flex w-12 shrink-0 flex-col items-center justify-center rounded-xl py-1">
+                    <span className="text-[0.55rem] font-bold tracking-[0.1em]">VENDI</span>
+                    <span className="font-serif text-2xl leading-none font-bold">{d.position}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <AutoTextarea
+                      value={d.title}
+                      onChange={(e) => updateDraft(d.key, { title: e.target.value })}
+                      placeholder="Titulli (nuk u lexua)"
+                      aria-label={`Titulli i librit te vendi ${d.position}`}
+                      className="w-full resize-none overflow-hidden rounded-lg border-2 border-transparent bg-transparent px-2 py-1.5 font-serif text-xl leading-snug font-bold outline-none placeholder:font-sans placeholder:text-base placeholder:font-normal placeholder:text-danger focus:border-accent focus:bg-bg"
+                    />
+                    <AutoTextarea
+                      value={d.author}
+                      onChange={(e) => updateDraft(d.key, { author: e.target.value })}
+                      placeholder="Autori"
+                      aria-label={`Autori i librit te vendi ${d.position}`}
+                      className="w-full resize-none overflow-hidden rounded-lg border-2 border-transparent bg-transparent px-2 py-1 text-lg leading-snug text-muted outline-none focus:border-accent focus:bg-bg"
+                    />
+                    {dup && (
+                      <p className="px-2 text-sm text-danger">
+                        Ky titull ekziston: Rafti {dup.shelf}, Vendi {dup.position}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDrafts((list) => list.filter((x) => x.key !== d.key))}
+                    aria-label={`Hiq librin te vendi ${d.position}`}
+                    className="-mr-1 flex h-12 w-10 shrink-0 items-center justify-center self-center rounded-full text-muted hover:bg-danger/10 hover:text-danger"
+                  >
+                    <CloseIcon className="h-6 w-6" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-col gap-2 border-t border-line bg-card px-6 pt-3 pb-6 shadow-[0_-10px_20px_-12px_rgba(80,50,20,0.35)]">
+            <button
+              type="button"
+              onClick={saveAll}
+              disabled={saving || drafts.length === 0}
+              className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-md disabled:opacity-60"
+            >
+              <CheckIcon className="h-6 w-6" />
+              {saving ? "Duke ruajtur…" : `Ruaj ${booksLabel(drafts.length)}`}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDrafts([]);
+                setStep("setup");
+              }}
+              className="h-12 rounded-2xl text-lg font-semibold text-muted"
+            >
+              Bëj foto prapë
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === "done" && lastSaved && (
+        <div className="flex flex-col gap-4 text-center">
+          <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-ok text-card">
+            <CheckIcon className="h-11 w-11" />
+          </span>
+          <p className="font-serif text-2xl font-bold">U ruajtën {booksLabel(lastSaved.count)}</p>
+          <p className="text-lg text-muted">
+            Rafti {shelf}, vendet {lastSaved.from}–{lastSaved.to}
+          </p>
+          <div className="mt-2 flex flex-col gap-3">
+            <label
+              htmlFor={PHOTO_INPUT_ID}
+              onClick={() => setStep("setup")}
+              className="flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-xl font-bold text-accent-ink"
+            >
+              <CameraIcon className="h-7 w-7" />
+              Vazhdo këtë raft (nga vendi {startPos})
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setShelf("");
+                setStartPos(1);
+                setStep("setup");
+              }}
+              className="h-16 rounded-2xl border-2 border-accent text-xl font-semibold text-accent-strong"
+            >
+              Raft tjetër
+            </button>
+            <button type="button" onClick={onClose} className="h-14 rounded-2xl text-lg font-semibold text-muted">
+              Mbaro
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/** Multi-line text field that grows with its content, so long titles stay fully visible. */
+function AutoTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [props.value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      enterKeyHint="done"
+      onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+      {...props}
+    />
+  );
+}
