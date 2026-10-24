@@ -82,6 +82,20 @@ export const LockIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const EyeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" />
+  </Svg>
+);
+
+export const EyeOffIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-2.6 3.6M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a10 10 0 0 0 5.4-1.6" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
+  </Svg>
+);
+
 export const SparkleIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />

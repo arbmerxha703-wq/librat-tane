@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { api } from "@/lib/client";
-import { LockIcon, ShelfDecoration } from "./icons";
+import { EyeIcon, EyeOffIcon, LockIcon, ShelfDecoration } from "./icons";
 
 export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) => void; notice?: string }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState(notice ?? "");
   const [busy, setBusy] = useState(false);
+  const [showCode, setShowCode] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,22 +34,39 @@ export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) 
         <div aria-hidden className="-mx-6 h-3 bg-black/25" />
       </div>
 
-      <form onSubmit={submit} className="animate-rise mx-3 -mt-4 rounded-3xl border border-line bg-card p-6 shadow-lg">
+      <form onSubmit={submit} className="animate-rise mx-1 -mt-4 rounded-3xl border border-line bg-card p-5 shadow-lg">
         <label htmlFor="passcode" className="mb-1 flex items-center gap-2 text-xl font-semibold">
           <LockIcon className="h-6 w-6 text-accent" />
           Shkruani kodin
         </label>
         <p className="mb-4 text-base text-muted">Kodi kërkohet vetëm një herë në këtë telefon.</p>
-        <input
-          id="passcode"
-          type="password"
-          inputMode="numeric"
-          autoComplete="current-password"
-          autoFocus
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          className="h-18 w-full rounded-2xl border-2 border-line bg-bg px-4 text-center text-4xl tracking-[0.4em] outline-none focus:border-accent"
-        />
+        <div className="relative">
+          {/* Full keyboard (letters + numbers); the phone must not capitalise or "correct" the code. */}
+          <input
+            id="passcode"
+            type={showCode ? "text" : "password"}
+            autoComplete="current-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoFocus
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            className="h-18 w-full rounded-2xl border-2 border-line bg-bg pr-14 pl-3 text-center text-xl outline-none focus:border-accent"
+          />
+          <button
+            type="button"
+            onClick={() => setShowCode((v) => !v)}
+            aria-label={showCode ? "Fshih kodin" : "Shfaq kodin"}
+            aria-pressed={showCode}
+            className="absolute top-1/2 right-2 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-xl text-muted hover:bg-soft"
+          >
+            {showCode ? <EyeOffIcon className="h-7 w-7" /> : <EyeIcon className="h-7 w-7" />}
+          </button>
+        </div>
+        <p className="mt-2 text-base text-muted">
+          Prekni syrin {showCode ? "për ta fshehur" : "për ta parë"} kodin që shkruani.
+        </p>
         {error && (
           <p role="alert" className="mt-3 rounded-xl bg-danger/10 px-4 py-3 text-lg font-medium text-danger">
             {error}
