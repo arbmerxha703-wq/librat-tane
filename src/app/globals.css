@@ -1,49 +1,53 @@
 @import "tailwindcss";
 
+/*
+ * "Classic library" palette: warm paper, deep library green, brass gold.
+ * Token names (accent, brass…) are shared by every component, so the palette lives only here.
+ */
 :root {
-  --bg: #f4ecdc;
-  --card: #fffbf3;
-  --ink: #33241a;
-  --muted: #76604b;
-  --accent: #8b5a2b;
-  --accent-strong: #6b4120;
+  --bg: #f4f1ea;
+  --card: #fffdf9;
+  --ink: #1d1b17;
+  --muted: #6b6458;
+  --accent: #1f5144;
+  --accent-strong: #173e34;
   --accent-ink: #ffffff;
-  --line: #e2d3b6;
-  --soft: #efe3cb;
-  --danger: #a3312a;
+  --line: #e3dccf;
+  --soft: #ece6da;
+  --danger: #b42318;
   --danger-ink: #ffffff;
-  --ok: #3f6b3a;
-  --wood-1: #8a5a33;
-  --wood-2: #6b4226;
-  --wood-3: #52311c;
-  --brass-1: #f3dfae;
-  --brass-2: #d9b56c;
-  --brass-ink: #4a3110;
-  --glow: rgba(139, 90, 43, 0.12);
+  --ok: #2f6b4f;
+  --brass-bg: #f5ead2;
+  --brass-line: #e2cc9a;
+  --brass-ink: #5f4310;
+  --gold: #c9973f;
+  --hero-1: #23594b;
+  --hero-2: #173e34;
+  --shadow: 0 1px 2px rgba(29, 27, 23, 0.05), 0 8px 24px -14px rgba(29, 27, 23, 0.25);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #17120d;
-    --card: #241c15;
-    --ink: #f3e8d6;
-    --muted: #c3ad93;
-    --accent: #d39a5b;
-    --accent-strong: #e8b77f;
-    --accent-ink: #1b1611;
-    --line: #3b2f24;
-    --soft: #30261d;
-    --danger: #e0766d;
-    --danger-ink: #1b1611;
-    --ok: #8fc286;
-    --wood-1: #7a4d2b;
-    --wood-2: #5f3a20;
-    --wood-3: #462915;
-    --brass-1: #e9cf93;
-    --brass-2: #c49a4c;
-    --brass-ink: #3a250b;
-    --glow: rgba(211, 154, 91, 0.1);
+    --bg: #101412;
+    --card: #181e1b;
+    --ink: #ece7dd;
+    --muted: #a39c8f;
+    --accent: #86c9ad;
+    --accent-strong: #a4dcc4;
+    --accent-ink: #0d1813;
+    --line: #2a322e;
+    --soft: #202824;
+    --danger: #f2867b;
+    --danger-ink: #1a0d0b;
+    --ok: #86c9a3;
+    --brass-bg: #2a2417;
+    --brass-line: #54451f;
+    --brass-ink: #ecc985;
+    --gold: #d9ae5f;
+    --hero-1: #1b4237;
+    --hero-2: #10291f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -16px rgba(0, 0, 0, 0.7);
     color-scheme: dark;
   }
 }
@@ -61,7 +65,11 @@
   --color-danger: var(--danger);
   --color-danger-ink: var(--danger-ink);
   --color-ok: var(--ok);
+  --color-brass: var(--brass-bg);
+  --color-brass-line: var(--brass-line);
   --color-brass-ink: var(--brass-ink);
+  --color-gold: var(--gold);
+  --shadow-card: var(--shadow);
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-serif: var(--font-playfair), Georgia, serif;
 }
@@ -74,13 +82,11 @@ html {
 
 body {
   background-color: var(--bg);
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, var(--glow), transparent),
-    radial-gradient(circle at 1px 1px, rgba(120, 80, 40, 0.05) 1px, transparent 0);
-  background-size: auto, 22px 22px;
+  background-image: radial-gradient(ellipse 90% 40% at 50% -8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent);
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
 }
 
 :focus-visible {
@@ -88,32 +94,27 @@ body {
   outline-offset: 2px;
 }
 
-/* Wooden shelf surface: header, shelf titles, passcode banner */
+/* Deep library-green surface (passcode banner, shelf headings) */
 .wood {
   background:
-    repeating-linear-gradient(92deg, rgba(255, 255, 255, 0.035) 0 2px, transparent 2px 9px),
-    repeating-linear-gradient(88deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 23px),
-    linear-gradient(160deg, var(--wood-1), var(--wood-2) 55%, var(--wood-3));
-  color: #fbf1df;
+    radial-gradient(120% 90% at 0% 0%, rgba(255, 255, 255, 0.08), transparent 55%),
+    linear-gradient(150deg, var(--hero-1), var(--hero-2));
+  color: #f4efe4;
 }
 
-/* Brass label plate showing shelf and position */
+/* Brass label: where a book stands */
 .brass {
-  background: linear-gradient(170deg, var(--brass-1), var(--brass-2));
+  background: var(--brass-bg);
   color: var(--brass-ink);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.12),
-    0 1px 2px rgba(0, 0, 0, 0.15);
+  box-shadow: inset 0 0 0 1px var(--brass-line);
 }
 
 .book-spine {
-  background-image:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.25), rgba(255, 255, 255, 0.12) 35%, rgba(0, 0, 0, 0.18));
+  background-image: linear-gradient(90deg, rgba(0, 0, 0, 0.22), rgba(255, 255, 255, 0.1) 35%, rgba(0, 0, 0, 0.16));
 }
 
 mark {
-  background: color-mix(in srgb, var(--brass-2) 55%, transparent);
+  background: color-mix(in srgb, var(--gold) 35%, transparent);
   color: inherit;
   border-radius: 0.25rem;
   padding: 0 0.1em;

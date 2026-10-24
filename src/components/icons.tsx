@@ -82,6 +82,32 @@ export const LockIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const MapPinIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" />
+    <circle cx="12" cy="9.5" r="2.5" />
+  </Svg>
+);
+
+export const ArrowDownIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 4v15M6 13l6 6 6-6" />
+  </Svg>
+);
+
+export const ChevronRightIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m9 6 6 6-6 6" />
+  </Svg>
+);
+
+export const BookOpenIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 6.5C10.5 5 8 4.5 3 4.5v14c5 0 7.5.5 9 2 1.5-1.5 4-2 9-2v-14c-5 0-7.5.5-9 2Z" />
+    <path d="M12 6.5v14" />
+  </Svg>
+);
+
 export const EyeIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />

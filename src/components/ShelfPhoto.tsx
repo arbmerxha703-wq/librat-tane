@@ -1,5 +1,7 @@
 "use client";
 
+import { ArrowDownIcon } from "./icons";
+
 /**
  * A stored shelf photo. Either numbers every scanned book (to spot missing ones while checking a scan),
  * or dims everything except one book (to show where a book stands).
@@ -24,7 +26,7 @@ export function ShelfPhoto({
   const minWidth = markers && markers.length > 6 ? `${markers.length * 44}px` : undefined;
 
   return (
-    <div className="overflow-x-auto overflow-y-hidden rounded-2xl border border-line bg-black shadow-md">
+    <div className="overflow-x-auto overflow-y-hidden rounded-2xl border border-line bg-black shadow-card">
       <div className="relative" style={{ minWidth }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL, not optimisable */}
         <img src={url} alt="Fotografia e raftit" className="block w-full select-none" draggable={false} />
@@ -38,11 +40,11 @@ export function ShelfPhoto({
               style={{ left: `${left}%`, width: `${right - left}%` }}
             />
             <div
-              className="absolute top-1 -translate-x-1/2 animate-bounce text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+              className="absolute top-2 flex h-10 w-10 -translate-x-1/2 animate-bounce items-center justify-center rounded-full bg-[#ffd166] text-[#3a2a06] shadow-lg"
               style={{ left: `${(left + right) / 2}%` }}
               aria-hidden
             >
-              ⬇️
+              <ArrowDownIcon className="h-6 w-6" />
             </div>
           </>
         )}

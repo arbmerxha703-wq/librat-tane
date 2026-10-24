@@ -3,7 +3,7 @@
 import type { Book } from "@/lib/types";
 import { matchRanges } from "@/lib/normalize";
 import { spineColor } from "@/lib/client";
-import { CheckIcon, TrashIcon } from "./icons";
+import { CheckIcon, MapPinIcon, TrashIcon } from "./icons";
 import { SpineThumb } from "./SpineThumb";
 
 export function Highlight({ text, query }: { text: string; query: string }) {
@@ -39,105 +39,99 @@ export function BookCard({
   onLocate: (book: Book) => void;
 }) {
   const color = spineColor(book.title);
+  const hasPhoto = !!photoUrl && book.x0 != null && book.x1 != null;
+  const where = `Rafti ${book.shelf} · i ${book.position}-ti`;
+
   return (
     <li
-      className="animate-rise flex overflow-hidden rounded-2xl border border-line bg-card shadow-[0_1px_0_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(80,50,20,0.35)]"
+      className="animate-rise overflow-hidden rounded-2xl border border-line bg-card shadow-card"
       style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
     >
-      {/* Book spine */}
-      <div aria-hidden className="book-spine relative flex w-9 shrink-0 flex-col items-center py-3" style={{ background: color }}>
-        <span className="h-0.5 w-full bg-[#e9cf93]/70" />
-        <span className="mt-0.5 h-px w-full bg-[#e9cf93]/50" />
-        <span className="mt-3 font-serif text-xl font-bold text-[#fbf1df]">{book.title.trim().charAt(0).toUpperCase()}</span>
-        <span className="mt-auto h-px w-full bg-[#e9cf93]/50" />
-        <span className="mt-0.5 h-0.5 w-full bg-[#e9cf93]/70" />
-      </div>
+      {/* The book's spine, cut from the shelf photo — tap to see where it stands */}
+      {hasPhoto && (
+        <button
+          type="button"
+          onClick={() => onLocate(book)}
+          aria-label={`Shiko ku është: ${where}`}
+          className="relative block w-full text-left"
+        >
+          <SpineThumb url={photoUrl!} x0={book.x0!} x1={book.x1!} />
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-full bg-black/65 px-3 py-1 text-base font-semibold text-white backdrop-blur-sm">
+            <MapPinIcon className="h-4 w-4" />
+            {where}
+          </span>
+        </button>
+      )}
 
-      <div className="min-w-0 flex-1 p-4">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <h3 className="font-serif text-2xl font-bold leading-tight break-words">
+      <div className="flex gap-4 p-4">
+        {!hasPhoto && (
+          // A small "cover" so books without a photo still read as books at a glance.
+          <div
+            aria-hidden
+            className="book-spine flex h-20 w-14 shrink-0 items-center justify-center rounded-md font-serif text-2xl font-bold text-white/90 shadow-card"
+            style={{ background: color }}
+          >
+            {book.title.trim().charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <h3 className="min-w-0 flex-1 font-serif text-2xl leading-tight font-bold break-words">
               <Highlight text={book.title} query={query} />
             </h3>
-            {book.author && (
-              <p className="mt-1 text-lg text-muted break-words">
-                <Highlight text={book.author} query={query} />
-              </p>
+            {book.is_sample && (
+              <span className="shrink-0 rounded-full bg-soft px-2.5 py-0.5 text-sm font-semibold text-muted">Shembull</span>
             )}
           </div>
-          {book.is_sample && (
-            <span className="shrink-0 rounded-full bg-soft px-2.5 py-1 text-sm font-semibold text-muted">Shembull</span>
+          {book.author && (
+            <p className="mt-1 text-lg text-muted break-words">
+              <Highlight text={book.author} query={query} />
+            </p>
+          )}
+          {!hasPhoto && (
+            <p className="brass mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-base font-semibold">
+              <MapPinIcon className="h-4 w-4" />
+              {where}
+            </p>
           )}
         </div>
+      </div>
 
-        {/* Where to find it — tap to see it on the photos */}
-        {photoUrl && book.x0 != null && book.x1 != null ? (
-          <button
-            type="button"
-            onClick={() => onLocate(book)}
-            aria-label={`Shiko ku është: rafti ${book.shelf}`}
-            className="mt-4 block w-full overflow-hidden rounded-xl border border-line text-left active:scale-[0.99]"
-          >
-            <SpineThumb url={photoUrl} x0={book.x0} x1={book.x1} />
-            <span className="brass flex items-center justify-between gap-2 px-4 py-2.5">
-              <span className="text-lg font-bold">📍 Shiko ku është</span>
-              <span className="text-sm font-semibold opacity-75">
-                Rafti {book.shelf} · i {book.position}-ti
-              </span>
-            </span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onLocate(book)}
-            aria-label={`Rafti ${book.shelf}, vendi ${book.position}. Shiko ku është`}
-            className="brass mt-4 block w-full overflow-hidden rounded-xl text-left active:scale-[0.99]"
-          >
-            <span className="grid grid-cols-2">
-              <span className="px-4 py-2 text-center">
-                <span className="block text-xs font-bold tracking-[0.18em] opacity-75">RAFTI</span>
-                <span className="block font-serif text-4xl leading-none font-bold">{book.shelf}</span>
-              </span>
-              <span className="border-l border-[color:var(--brass-ink)]/20 px-4 py-2 text-center">
-                <span className="block text-xs font-bold tracking-[0.18em] opacity-75">VENDI</span>
-                <span className="block font-serif text-4xl leading-none font-bold">{book.position}</span>
-              </span>
-            </span>
-            <span className="flex items-center justify-center gap-1.5 border-t border-[color:var(--brass-ink)]/20 bg-black/5 py-1.5 text-base font-bold">
-              📍 Shiko ku është
-            </span>
-          </button>
-        )}
-
-        <div className="mt-3 flex items-center gap-2">
-          <button
-            type="button"
-            aria-pressed={book.is_read}
-            onClick={() => onToggleRead(book)}
-            className={`flex h-13 flex-1 items-center justify-center gap-2 rounded-xl border-2 px-3 text-lg font-semibold transition-colors ${
-              book.is_read ? "border-ok bg-ok/10 text-ok" : "border-line text-muted hover:bg-soft"
+      <div className="grid grid-cols-[1fr_auto_auto] border-t border-line">
+        <button
+          type="button"
+          onClick={() => onLocate(book)}
+          className="flex h-14 items-center justify-center gap-2 text-lg font-bold text-accent-strong hover:bg-soft active:bg-soft"
+        >
+          <MapPinIcon className="h-6 w-6" />
+          Ku është?
+        </button>
+        <button
+          type="button"
+          aria-pressed={book.is_read}
+          onClick={() => onToggleRead(book)}
+          className={`flex h-14 items-center gap-2 border-l border-line px-4 text-lg font-semibold hover:bg-soft ${
+            book.is_read ? "text-ok" : "text-muted"
+          }`}
+        >
+          <span
+            aria-hidden
+            className={`flex h-6 w-6 items-center justify-center rounded-md border-2 ${
+              book.is_read ? "border-ok bg-ok text-card" : "border-current"
             }`}
           >
-            <span
-              aria-hidden
-              className={`flex h-6 w-6 items-center justify-center rounded-md border-2 ${
-                book.is_read ? "border-ok bg-ok text-card" : "border-current"
-              }`}
-            >
-              {book.is_read && <CheckIcon className="h-4 w-4" />}
-            </span>
-            {book.is_read ? "E lexuar" : "E kam lexuar"}
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(book)}
-            aria-label={`Fshi „${book.title}“`}
-            className="flex h-13 items-center gap-1.5 rounded-xl px-3 text-lg font-medium text-danger hover:bg-danger/10"
-          >
-            <TrashIcon className="h-5 w-5" />
-            Fshi
-          </button>
-        </div>
+            {book.is_read && <CheckIcon className="h-4 w-4" />}
+          </span>
+          Lexuar
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(book)}
+          aria-label={`Fshi „${book.title}“`}
+          className="flex h-14 w-14 items-center justify-center border-l border-line text-muted hover:bg-danger/10 hover:text-danger"
+        >
+          <TrashIcon className="h-6 w-6" />
+        </button>
       </div>
     </li>
   );

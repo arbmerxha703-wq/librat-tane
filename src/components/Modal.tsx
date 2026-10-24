@@ -26,7 +26,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-[#1b120a]/60 backdrop-blur-[2px] sm:items-center sm:p-6"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 backdrop-blur-[3px] sm:items-center sm:p-6"
       onClick={onClose}
     >
       <div
@@ -36,14 +36,14 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
         className="animate-sheet max-h-[94dvh] w-full max-w-lg min-w-0 overflow-x-hidden overflow-y-auto rounded-t-[2rem] border border-line bg-card px-6 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[2rem] sm:pt-6"
       >
-        <div aria-hidden className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-line sm:hidden" />
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <h2 className="font-serif text-3xl font-bold">{title}</h2>
+        <div aria-hidden className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-line sm:hidden" />
+        <div className="-mx-6 mb-5 flex items-center justify-between gap-4 border-b border-line px-6 pb-4">
+          <h2 className="font-serif text-[1.75rem] leading-tight font-bold">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Mbyll"
-            className="-mr-2 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-soft text-muted hover:text-ink"
+            className="-mr-2 flex h-13 w-13 shrink-0 items-center justify-center rounded-full bg-soft text-muted hover:text-ink"
           >
             <CloseIcon className="h-7 w-7" />
           </button>

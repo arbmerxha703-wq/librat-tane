@@ -212,7 +212,7 @@ export function ShelfScanSheet({
                           onClick={() => changeShelf(s)}
                           aria-pressed={active}
                           className={`h-12 min-w-12 rounded-xl px-4 text-xl font-bold ${
-                            active ? "bg-[color:var(--brass-ink)] text-[color:var(--brass-1)]" : "bg-white/55 hover:bg-white/80"
+                            active ? "bg-accent text-accent-ink" : "bg-card text-ink ring-1 ring-brass-line hover:ring-accent"
                           }`}
                         >
                           {s}
@@ -228,7 +228,7 @@ export function ShelfScanSheet({
                   placeholder={shelves.length ? "ose shkruani një raft të ri" : "p.sh. 1"}
                   aria-label="Rafti"
                   autoComplete="off"
-                  className="h-14 w-full rounded-xl border-2 border-transparent bg-white/70 px-4 text-xl text-[#33241a] outline-none placeholder:text-[#33241a]/50 focus:border-[color:var(--brass-ink)]"
+                  className="h-14 w-full rounded-xl border-2 border-brass-line bg-card px-4 text-xl text-ink outline-none placeholder:text-muted focus:border-accent"
                 />
               </div>
             </details>

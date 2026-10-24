@@ -10,7 +10,7 @@ import { AddBookSheet } from "./AddBookSheet";
 import { ShelfScanSheet } from "./ShelfScanSheet";
 import { LocateSheet } from "./LocateSheet";
 import { ConfirmDialog } from "./Modal";
-import { BookIcon, CameraIcon, CheckIcon, CloseIcon, PlusIcon, SearchIcon, ShelfDecoration, ShelvesIcon, SparkleIcon } from "./icons";
+import { BookOpenIcon, CameraIcon, CheckIcon, CloseIcon, PlusIcon, SearchIcon, ShelvesIcon, SparkleIcon } from "./icons";
 
 type Filter = "all" | "read" | "unread";
 
@@ -197,56 +197,50 @@ export function Library() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-40">
-      {/* Header: a wooden shelf */}
-      <header className="wood relative mt-4 overflow-hidden rounded-3xl px-5 pt-5 shadow-lg">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.16em] text-[#f3dfae]/80 uppercase">Biblioteka e shtëpisë</p>
-            <h1 className="mt-1 font-serif text-4xl leading-tight font-bold sm:text-5xl">Librat Tanë</h1>
+      {/* Top bar */}
+      <header className="flex items-center justify-between gap-4 pt-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-accent-ink shadow-card">
+            <BookOpenIcon className="h-7 w-7" />
+          </span>
+          <div className="leading-tight">
+            <p className="font-serif text-2xl font-bold">Librat Tanë</p>
+            <p className="text-sm font-medium text-muted">Biblioteka e shtëpisë</p>
           </div>
-          <BookIcon className="mt-1 h-9 w-9 shrink-0 text-[#f3dfae]/80" />
         </div>
-        <p className="mt-2 text-lg text-[#fbf1df]/85">
-          {books ? (
-            <>
-              <strong className="font-semibold text-[#fbf1df]">{booksLabel(counts.all)}</strong> në{" "}
-              {shelves.length === 1 ? "1 raft" : `${shelves.length} rafte`}
-            </>
-          ) : (
-            "Duke ngarkuar…"
-          )}
-        </p>
-        <ShelfDecoration className="mt-4 ml-1" />
-        <div aria-hidden className="-mx-5 h-3 bg-black/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]" />
+        {books && (
+          <div className="text-right leading-tight">
+            <p className="font-serif text-2xl font-bold tabular-nums">{counts.all}</p>
+            <p className="text-sm font-medium text-muted">{counts.all === 1 ? "libër" : "libra"}</p>
+          </div>
+        )}
       </header>
 
+      <h1 className="mt-8 font-serif text-[2rem] leading-tight font-bold sm:text-4xl">Çfarë libri kërkoni?</h1>
+      <p className="mt-1 text-lg text-muted">Shkruani një pjesë të titullit ose të autorit.</p>
+
       {/* Search */}
-      <div className="sticky top-0 z-20 -mx-4 mt-4 bg-gradient-to-b from-bg via-bg to-bg/0 px-4 pt-2 pb-4">
+      <div className="sticky top-0 z-20 -mx-4 bg-bg/90 px-4 pt-3 pb-3 backdrop-blur-md">
         <div className="relative">
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 left-3 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-xl bg-accent text-accent-ink"
-          >
-            <SearchIcon className="h-7 w-7" />
-          </span>
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-5 h-7 w-7 -translate-y-1/2 text-muted" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Kërko librin…"
+            placeholder="p.sh. Kadare"
             aria-label="Kërko titullin ose autorin"
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
             enterKeyHint="search"
-            className="h-18 w-full rounded-2xl border-2 border-line bg-card pr-16 pl-18 text-2xl shadow-[0_10px_30px_-15px_rgba(80,50,20,0.45)] outline-none placeholder:text-muted/70 focus:border-accent [&::-webkit-search-cancel-button]:hidden"
+            className="h-17 w-full rounded-2xl border border-line bg-card pr-16 pl-15 text-2xl shadow-card outline-none placeholder:text-muted/60 focus:border-accent focus:ring-4 focus:ring-accent/15 [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery("")}
               aria-label="Pastro kërkimin"
-              className="absolute top-1/2 right-2 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:bg-soft"
+              className="absolute top-1/2 right-2 flex h-13 w-13 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:bg-soft"
             >
               <CloseIcon className="h-7 w-7" />
             </button>
@@ -255,8 +249,8 @@ export function Library() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-3">
-        <div role="radiogroup" aria-label="Shfaq" className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-soft p-1.5">
+      <div className="mt-1 flex flex-col gap-3">
+        <div role="radiogroup" aria-label="Shfaq" className="grid grid-cols-3 gap-1 rounded-2xl bg-soft p-1">
           {filters.map((f) => (
             <button
               key={f.value}
@@ -264,39 +258,38 @@ export function Library() {
               role="radio"
               aria-checked={filter === f.value}
               onClick={() => setFilter(f.value)}
-              className={`flex h-16 flex-col items-center justify-center rounded-xl leading-tight transition-colors ${
-                filter === f.value ? "bg-card text-accent-strong shadow-md" : "text-muted hover:text-ink"
+              className={`flex h-15 flex-col items-center justify-center rounded-xl leading-tight transition-colors ${
+                filter === f.value ? "bg-card text-ink shadow-card" : "text-muted hover:text-ink"
               }`}
             >
-              <span className="text-lg font-semibold">{f.label}</span>
-              <span className="text-sm font-medium opacity-80">{f.count}</span>
+              <span className="text-lg font-semibold whitespace-nowrap">{f.label}</span>
+              <span className={`text-sm font-semibold tabular-nums ${filter === f.value ? "text-accent" : ""}`}>{f.count}</span>
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={byShelf}
-          onClick={() => setByShelf((v) => !v)}
-          className={`flex h-16 items-center gap-3 rounded-2xl border-2 px-4 text-lg font-semibold transition-colors ${
-            byShelf ? "border-accent bg-card" : "border-line bg-card"
-          }`}
-        >
-          <span
-            className={`flex h-10 w-10 items-center justify-center rounded-xl ${byShelf ? "bg-accent text-accent-ink" : "bg-soft text-muted"}`}
+        <div className="flex items-center justify-between gap-3 px-1">
+          <p className="text-lg text-muted">
+            {books && (query || filter !== "all") ? booksLabel(visible.length) : ""}
+          </p>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={byShelf}
+            onClick={() => setByShelf((v) => !v)}
+            className="flex h-12 shrink-0 items-center gap-3 rounded-full px-2 text-lg font-semibold"
           >
-            <ShelvesIcon className="h-6 w-6" />
-          </span>
-          <span className="flex-1 text-left">Sipas rafteve</span>
-          <span aria-hidden className={`relative h-8 w-14 rounded-full transition-colors ${byShelf ? "bg-accent" : "bg-line"}`}>
-            <span
-              className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${byShelf ? "left-7" : "left-1"}`}
-            />
-          </span>
-        </button>
+            <ShelvesIcon className={`h-6 w-6 ${byShelf ? "text-accent" : "text-muted"}`} />
+            Sipas rafteve
+            <span aria-hidden className={`relative h-7 w-12 rounded-full transition-colors ${byShelf ? "bg-accent" : "bg-line"}`}>
+              <span
+                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${byShelf ? "left-[22px]" : "left-0.5"}`}
+              />
+            </span>
+          </button>
+        </div>
       </div>
 
-      <main className="mt-6" aria-live="polite">
+      <main className="mt-4" aria-live="polite">
         {books === null ? (
           <div className="py-12 text-center text-xl text-muted">
             {loadError ? (
@@ -322,45 +315,36 @@ export function Library() {
             onSamples={() => changeSamples("POST")}
           />
         ) : visible.length === 0 ? (
-          <div className="animate-rise rounded-3xl border border-dashed border-line bg-card/60 px-6 py-10 text-center">
-            <SearchIcon className="mx-auto h-12 w-12 text-muted/60" />
-            <p className="mt-3 font-serif text-2xl font-bold">Nuk u gjet asnjë libër</p>
+          <div className="animate-rise rounded-3xl border border-dashed border-line px-6 py-12 text-center">
+            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-soft text-muted">
+              <SearchIcon className="h-8 w-8" />
+            </span>
+            <p className="mt-4 font-serif text-2xl font-bold">Nuk u gjet asnjë libër</p>
             <p className="mt-2 text-lg text-muted">
               {query ? "Provoni vetëm një fjalë, p.sh. mbiemrin e autorit." : "Asnjë libër në këtë listë."}
             </p>
           </div>
+        ) : byShelf ? (
+          <div className="flex flex-col gap-8">
+            {groups.map(([shelf, list]) => (
+              <section key={shelf} aria-label={`Rafti ${shelf}`}>
+                <h2 className="mb-3 flex items-baseline justify-between gap-3 border-b border-line pb-2">
+                  <span className="font-serif text-2xl font-bold">Rafti {shelf}</span>
+                  <span className="text-base font-medium text-muted">{booksLabel(list.length)}</span>
+                </h2>
+                <BookList books={list} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} photoUrls={photoUrls} />
+              </section>
+            ))}
+          </div>
         ) : (
-          <>
-            {(query || filter !== "all") && (
-              <p className="mb-3 px-1 text-lg text-muted">
-                {visible.length === 1 ? "U gjet 1 libër" : `U gjetën ${visible.length} libra`}
-              </p>
-            )}
-            {byShelf ? (
-              <div className="flex flex-col gap-8">
-                {groups.map(([shelf, list]) => (
-                  <section key={shelf} aria-label={`Rafti ${shelf}`}>
-                    <h2 className="wood mb-4 flex items-center justify-between rounded-2xl px-5 py-3 shadow-md">
-                      <span className="font-serif text-3xl font-bold">Rafti {shelf}</span>
-                      <span className="rounded-full bg-black/25 px-3 py-1 text-base font-semibold">
-                        {booksLabel(list.length)}
-                      </span>
-                    </h2>
-                    <BookList books={list} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} photoUrls={photoUrls} />
-                  </section>
-                ))}
-              </div>
-            ) : (
-              <BookList books={visible} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} photoUrls={photoUrls} />
-            )}
-          </>
+          <BookList books={visible} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} photoUrls={photoUrls} />
         )}
       </main>
 
       {sampleCount > 0 && (
-        <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-line bg-soft p-4">
+        <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-line bg-card p-5 shadow-card">
           <p className="flex gap-3 text-lg">
-            <SparkleIcon className="mt-1 h-6 w-6 shrink-0 text-accent" />
+            <SparkleIcon className="mt-1 h-6 w-6 shrink-0 text-gold" />
             <span>
               Në katalog ka <strong>{booksLabel(sampleCount)} shembull</strong>, për të provuar aplikacionin.
             </span>
@@ -368,7 +352,7 @@ export function Library() {
           <button
             type="button"
             onClick={() => setRemovingSamples(true)}
-            className="h-14 w-full rounded-xl border-2 border-danger bg-card text-lg font-semibold text-danger"
+            className="h-13 w-full rounded-xl border border-danger/40 text-lg font-semibold text-danger hover:bg-danger/5"
           >
             Hiq librat shembull
           </button>
@@ -376,20 +360,20 @@ export function Library() {
       )}
 
       {books && books.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 bg-gradient-to-t from-bg via-bg/95 to-transparent px-4 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/85 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-lg">
           <div className="mx-auto grid max-w-2xl grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setScanningShelf(true)}
-              className="flex h-18 items-center justify-center gap-2 rounded-2xl border-2 border-accent bg-card text-xl font-bold text-accent-strong shadow-[0_12px_30px_-12px_rgba(80,50,20,0.5)] active:scale-[0.99]"
+              className="flex h-16 items-center justify-center gap-2 rounded-2xl border border-line bg-card text-xl font-bold text-ink shadow-card active:scale-[0.99]"
             >
-              <CameraIcon className="h-7 w-7 shrink-0" />
+              <CameraIcon className="h-7 w-7 shrink-0 text-accent" />
               Foto e raftit
             </button>
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="flex h-18 items-center justify-center gap-2 rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-[0_12px_30px_-10px_rgba(80,50,20,0.7)] active:scale-[0.99]"
+              className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-card active:scale-[0.99]"
             >
               <PlusIcon className="h-7 w-7 shrink-0" />
               Shto libër
@@ -401,7 +385,7 @@ export function Library() {
       {toast && (
         <div
           role="status"
-          className="animate-rise fixed inset-x-4 bottom-32 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink px-5 py-4 text-lg text-bg shadow-xl"
+          className="animate-rise fixed inset-x-4 bottom-28 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink px-5 py-4 text-lg text-bg shadow-xl"
         >
           <CheckIcon className="h-6 w-6 shrink-0" />
           <span>{toast}</span>
@@ -499,9 +483,10 @@ function BookList({
 
 function LoadingShelf() {
   return (
-    <div className="flex flex-col items-center gap-4">
-      <ShelfDecoration className="animate-pulse" />
-      <p>Duke ngarkuar librat…</p>
+    <div className="flex flex-col gap-4" aria-label="Duke ngarkuar librat">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="h-36 animate-pulse rounded-2xl bg-soft" />
+      ))}
     </div>
   );
 }
@@ -518,18 +503,21 @@ function EmptyCatalog({
   onSamples: () => void;
 }) {
   return (
-    <div className="animate-rise rounded-3xl border border-line bg-card p-6 text-center shadow-sm">
-      <ShelfDecoration className="mx-auto w-fit opacity-90" />
-      <div aria-hidden className="wood mx-auto h-2.5 w-64 max-w-full rounded-sm" />
-      <p className="mt-6 font-serif text-3xl font-bold">Raftet janë bosh</p>
-      <p className="mt-2 text-lg text-muted">
-        Mënyra më e shpejtë: bëni foto një rafti të tërë dhe librat shtohen të gjithë njëherësh.
-      </p>
-      <div className="mt-6 flex flex-col gap-3">
+    <div className="animate-rise overflow-hidden rounded-3xl border border-line bg-card shadow-card">
+      <div className="wood flex flex-col items-center px-6 pt-8 pb-6 text-center">
+        <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/12 ring-1 ring-white/20">
+          <BookOpenIcon className="h-9 w-9" />
+        </span>
+        <p className="mt-4 font-serif text-3xl font-bold">Biblioteka është bosh</p>
+        <p className="mt-2 text-lg text-white/80">
+          Mënyra më e shpejtë: bëni foto një rafti dhe librat shtohen të gjithë njëherësh.
+        </p>
+      </div>
+      <div className="flex flex-col gap-3 p-5">
         <button
           type="button"
           onClick={onScanShelf}
-          className="flex h-18 items-center justify-center gap-3 rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-md"
+          className="flex h-17 items-center justify-center gap-3 rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-card"
         >
           <CameraIcon className="h-8 w-8" />
           Fotografo një raft
@@ -537,19 +525,19 @@ function EmptyCatalog({
         <button
           type="button"
           onClick={onAdd}
-          className="flex h-16 items-center justify-center gap-2 rounded-2xl border-2 border-accent text-xl font-semibold text-accent-strong"
+          className="flex h-16 items-center justify-center gap-2 rounded-2xl border border-line text-xl font-semibold text-ink hover:bg-soft"
         >
-          <PlusIcon className="h-7 w-7" />
-          Shto libër
+          <PlusIcon className="h-7 w-7 text-accent" />
+          Shto një libër
         </button>
         <button
           type="button"
           onClick={onSamples}
           disabled={busy}
-          className="flex h-14 items-center justify-center gap-2 rounded-2xl text-lg font-semibold text-muted disabled:opacity-60"
+          className="flex h-13 items-center justify-center gap-2 rounded-2xl text-lg font-semibold text-muted disabled:opacity-60"
         >
           <SparkleIcon className="h-6 w-6" />
-          {busy ? "Duke shtuar…" : "Shto 10 libra shembull"}
+          {busy ? "Duke shtuar…" : "Provo me 10 libra shembull"}
         </button>
       </div>
     </div>

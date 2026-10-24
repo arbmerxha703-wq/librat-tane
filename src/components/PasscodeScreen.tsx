@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/client";
-import { EyeIcon, EyeOffIcon, LockIcon, ShelfDecoration } from "./icons";
+import { BookOpenIcon, EyeIcon, EyeOffIcon, LockIcon } from "./icons";
 
 export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) => void; notice?: string }) {
   const [code, setCode] = useState("");
@@ -27,14 +27,15 @@ export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) 
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
-      <div className="wood animate-rise overflow-hidden rounded-[2rem] px-6 pt-8 text-center shadow-xl">
-        <p className="text-sm font-semibold tracking-[0.2em] text-[#f3dfae]/80 uppercase">Biblioteka e shtëpisë</p>
-        <h1 className="mt-2 font-serif text-5xl font-bold">Librat Tanë</h1>
-        <ShelfDecoration className="mx-auto mt-6 w-fit" />
-        <div aria-hidden className="-mx-6 h-3 bg-black/25" />
+      <div className="animate-rise flex flex-col items-center text-center">
+        <span className="flex h-20 w-20 items-center justify-center rounded-3xl bg-accent text-accent-ink shadow-card">
+          <BookOpenIcon className="h-11 w-11" />
+        </span>
+        <h1 className="mt-5 font-serif text-5xl font-bold">Librat Tanë</h1>
+        <p className="mt-2 text-lg text-muted">Biblioteka e shtëpisë — gjeni çdo libër në sekonda.</p>
       </div>
 
-      <form onSubmit={submit} className="animate-rise mx-1 -mt-4 rounded-3xl border border-line bg-card p-5 shadow-lg">
+      <form onSubmit={submit} className="animate-rise mt-8 rounded-3xl border border-line bg-card p-6 shadow-card">
         <label htmlFor="passcode" className="mb-1 flex items-center gap-2 text-xl font-semibold">
           <LockIcon className="h-6 w-6 text-accent" />
           Shkruani kodin
@@ -52,7 +53,7 @@ export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) 
             autoFocus
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            className="h-18 w-full rounded-2xl border-2 border-line bg-bg pr-14 pl-3 text-center text-xl outline-none focus:border-accent"
+            className="h-18 w-full rounded-2xl border border-line bg-bg pr-14 pl-3 text-center text-xl outline-none focus:border-accent focus:ring-4 focus:ring-accent/15"
           />
           <button
             type="button"
@@ -75,7 +76,7 @@ export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) 
         <button
           type="submit"
           disabled={busy || !code.trim()}
-          className="mt-5 h-16 w-full rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-md disabled:opacity-50"
+          className="mt-5 h-16 w-full rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-card disabled:opacity-50"
         >
           {busy ? "Duke kontrolluar…" : "Hyr"}
         </button>
