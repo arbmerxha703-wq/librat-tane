@@ -1,18 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Book } from "@/lib/types";
+import type { Book, NewBook } from "@/lib/types";
 import { compareByLocation, compareShelves, matchesQuery } from "@/lib/normalize";
-import { api, ApiError, booksLabel, getSavedPasscode, savePasscode } from "@/lib/client";
+import { api, ApiError, booksLabel, getSavedPasscode, rememberBorrower, savePasscode } from "@/lib/client";
 import { PasscodeScreen } from "./PasscodeScreen";
 import { BookCard } from "./BookCard";
 import { AddBookSheet } from "./AddBookSheet";
 import { ShelfScanSheet } from "./ShelfScanSheet";
 import { LocateSheet } from "./LocateSheet";
+import { BookMenuSheet } from "./BookMenuSheet";
+import { EditBookSheet } from "./EditBookSheet";
 import { ConfirmDialog } from "./Modal";
-import { BookOpenIcon, CameraIcon, CheckIcon, CloseIcon, Monogram, PlusIcon, SearchIcon, ShelvesIcon, SparkleIcon } from "./icons";
+import { BookOpenIcon, CameraIcon, CheckIcon, ChevronRightIcon, CloseIcon, LendIcon, Monogram, PlusIcon, SearchIcon, ShelvesIcon, SparkleIcon } from "./icons";
 
-type Filter = "all" | "read" | "unread";
+type Filter = "all" | "read" | "unread" | "loaned";
 
 export function Library() {
   const [passcode, setPasscode] = useState<string | null>(getSavedPasscode);
@@ -21,12 +23,14 @@ export function Library() {
   const [books, setBooks] = useState<Book[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [chosenFilter, setFilter] = useState<Filter>("all");
   const [byShelf, setByShelf] = useState(false);
   const [adding, setAdding] = useState(false);
   const [scanningShelf, setScanningShelf] = useState(false);
   const [toDelete, setToDelete] = useState<Book | null>(null);
   const [locating, setLocating] = useState<Book | null>(null);
+  const [menuFor, setMenuFor] = useState<Book | null>(null);
+  const [editing, setEditing] = useState<Book | null>(null);
   // Short-lived links to shelf photos, for the close-ups on the book cards.
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [removingSamples, setRemovingSamples] = useState(false);
@@ -82,12 +86,19 @@ export function Library() {
   const counts = useMemo(() => {
     const all = books?.length ?? 0;
     const read = books?.filter((b) => b.is_read).length ?? 0;
-    return { all, read, unread: all - read };
+    const loaned = books?.filter((b) => b.loaned_to).length ?? 0;
+    return { all, read, unread: all - read, loaned };
   }, [books]);
+
+  // Once the last lent book comes back, the "lent books" view has nothing left: go back to all books.
+  const filter: Filter = chosenFilter === "loaned" && counts.loaned === 0 ? "all" : chosenFilter;
 
   const visible = useMemo(() => {
     const list = (books ?? []).filter(
-      (b) => (filter === "all" || (filter === "read") === b.is_read) && matchesQuery(b, query),
+      (b) =>
+        (filter === "all" ||
+          (filter === "loaned" ? !!b.loaned_to : filter !== "read" ? !b.is_read : b.is_read)) &&
+        matchesQuery(b, query),
     );
     return byShelf
       ? list.sort(compareByLocation)
@@ -147,6 +158,61 @@ export function Library() {
     }
   }
 
+  /** Replaces one book in the list with the server's copy. */
+  const putBook = (book: Book) => setBooks((prev) => prev?.map((b) => (b.id === book.id ? book : b)) ?? null);
+
+  async function saveEdit(patch: Partial<NewBook>) {
+    if (!passcode || !editing) return;
+    setBusy(true);
+    try {
+      const { book } = await api<{ book: Book }>(`/api/books/${editing.id}`, passcode, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      });
+      putBook(book);
+      setEditing(null);
+      setToast(`„${book.title}“ u ruajt — Rafti ${book.shelf}, i ${book.position}-ti.`);
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function lend(book: Book, to: string) {
+    if (!passcode) return;
+    setBusy(true);
+    try {
+      const { loan } = await api<{ loan: { to: string; at: string } }>(`/api/books/${book.id}/loan`, passcode, {
+        method: "PUT",
+        body: JSON.stringify({ to }),
+      });
+      rememberBorrower(loan.to);
+      putBook({ ...book, loaned_to: loan.to, loaned_at: loan.at });
+      setMenuFor(null);
+      setToast(`„${book.title}“ u shënua te ${loan.to}.`);
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function giveBack(book: Book) {
+    if (!passcode) return;
+    setBusy(true);
+    try {
+      await api(`/api/books/${book.id}/loan`, passcode, { method: "DELETE" });
+      putBook({ ...book, loaned_to: undefined, loaned_at: undefined });
+      setMenuFor(null);
+      setToast(`„${book.title}“ u kthye në raft.`);
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function confirmDelete() {
     if (!passcode || !toDelete) return;
     setBusy(true);
@@ -198,7 +264,7 @@ export function Library() {
   return (
     <div className="mx-auto max-w-2xl px-4 pb-40">
       {/* Hero */}
-      <header className="hero relative -mx-4 overflow-hidden rounded-b-[2.5rem] px-6 pt-6 pb-20 shadow-card">
+      <header className="hero relative -mx-4 overflow-hidden rounded-b-[2.5rem] px-6 pt-[max(1.5rem,calc(env(safe-area-inset-top)+0.75rem))] pb-20 shadow-card">
         <div className="flex items-center justify-between gap-4">
           <Monogram />
           {books && (
@@ -298,6 +364,39 @@ export function Library() {
         </div>
       </div>
 
+      {counts.loaned > 0 &&
+        (filter === "loaned" ? (
+          <div className="brass mt-4 flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
+            <p className="flex items-center gap-2 text-lg font-semibold">
+              <LendIcon className="h-6 w-6" />
+              Librat e dhënë hua
+            </p>
+            <button
+              type="button"
+              onClick={() => setFilter("all")}
+              aria-label="Kthehu te të gjithë librat"
+              className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-black/5"
+            >
+              <CloseIcon className="h-6 w-6" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setFilter("loaned")}
+            className="brass mt-4 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left"
+          >
+            <LendIcon className="h-7 w-7 shrink-0" />
+            <span className="flex-1 text-lg">
+              <strong>{booksLabel(counts.loaned)}</strong> {counts.loaned === 1 ? "është dhënë" : "janë dhënë"} hua
+            </span>
+            <span className="flex items-center gap-1 text-base font-semibold">
+              Shiko
+              <ChevronRightIcon className="h-5 w-5" />
+            </span>
+          </button>
+        ))}
+
       <main className="mt-4" aria-live="polite">
         {books === null ? (
           <div className="py-12 text-center text-xl text-muted">
@@ -347,12 +446,12 @@ export function Library() {
                   </span>
                   <span aria-hidden className="gold-rule mt-3 block" />
                 </h2>
-                <BookList books={list} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} photoUrls={photoUrls} />
+                <BookList books={list} query={query} onToggleRead={toggleRead} onMore={setMenuFor} onLocate={setLocating} photoUrls={photoUrls} />
               </section>
             ))}
           </div>
         ) : (
-          <BookList books={visible} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} photoUrls={photoUrls} />
+          <BookList books={visible} query={query} onToggleRead={toggleRead} onMore={setMenuFor} onLocate={setLocating} photoUrls={photoUrls} />
         )}
       </main>
 
@@ -430,6 +529,34 @@ export function Library() {
         />
       )}
 
+      {menuFor && (
+        <BookMenuSheet
+          book={menuFor}
+          busy={busy}
+          onLend={(to) => lend(menuFor, to)}
+          onReturn={() => giveBack(menuFor)}
+          onEdit={() => {
+            setEditing(menuFor);
+            setMenuFor(null);
+          }}
+          onDelete={() => {
+            setToDelete(menuFor);
+            setMenuFor(null);
+          }}
+          onClose={() => setMenuFor(null)}
+        />
+      )}
+
+      {editing && (
+        <EditBookSheet
+          book={editing}
+          shelves={shelves}
+          busy={busy}
+          onSave={saveEdit}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
       {locating && passcode && (
         <LocateSheet book={locating} passcode={passcode} onClose={() => setLocating(null)} />
       )}
@@ -467,14 +594,14 @@ function BookList({
   books,
   query,
   onToggleRead,
-  onDelete,
+  onMore,
   onLocate,
   photoUrls,
 }: {
   books: Book[];
   query: string;
   onToggleRead: (b: Book) => void;
-  onDelete: (b: Book) => void;
+  onMore: (b: Book) => void;
   onLocate: (b: Book) => void;
   photoUrls: Record<string, string>;
 }) {
@@ -487,7 +614,7 @@ function BookList({
           query={query}
           index={i}
           onToggleRead={onToggleRead}
-          onDelete={onDelete}
+          onMore={onMore}
           onLocate={onLocate}
           photoUrl={b.photo_path ? photoUrls[b.photo_path] || null : null}
         />

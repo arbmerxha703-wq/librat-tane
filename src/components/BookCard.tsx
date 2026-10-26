@@ -2,8 +2,8 @@
 
 import type { Book } from "@/lib/types";
 import { matchRanges } from "@/lib/normalize";
-import { spineColor } from "@/lib/client";
-import { CheckIcon, MapPinIcon, TrashIcon } from "./icons";
+import { loanInfo, spineColor } from "@/lib/client";
+import { CheckIcon, DotsIcon, LendIcon, MapPinIcon } from "./icons";
 import { SpineThumb } from "./SpineThumb";
 
 export function Highlight({ text, query }: { text: string; query: string }) {
@@ -25,7 +25,7 @@ export function BookCard({
   query,
   index,
   onToggleRead,
-  onDelete,
+  onMore,
   onLocate,
   photoUrl,
 }: {
@@ -35,12 +35,14 @@ export function BookCard({
   /** Link to the shelf photo this book was scanned from, if any. */
   photoUrl?: string | null;
   onToggleRead: (book: Book) => void;
-  onDelete: (book: Book) => void;
+  /** Opens "⋯": lend / return, edit, delete. */
+  onMore: (book: Book) => void;
   onLocate: (book: Book) => void;
 }) {
   const color = spineColor(book.title);
   const hasPhoto = !!photoUrl && book.x0 != null && book.x1 != null;
   const where = `Rafti ${book.shelf} · i ${book.position}-ti`;
+  const loan = loanInfo(book);
 
   return (
     <li
@@ -85,6 +87,18 @@ export function BookCard({
             <p className="mt-1 text-lg text-muted break-words">
               <Highlight text={book.author} query={query} />
             </p>
+          )}
+          {loan && (
+            <button
+              type="button"
+              onClick={() => onMore(book)}
+              className={`mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-base font-semibold ring-1 ${
+                loan.late ? "bg-danger/10 text-danger ring-danger/40" : "brass"
+              }`}
+            >
+              <LendIcon className="h-5 w-5" />
+              {loan.text}
+            </button>
           )}
           {(!hasPhoto || book.is_sample) && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -133,11 +147,11 @@ export function BookCard({
         </button>
         <button
           type="button"
-          onClick={() => onDelete(book)}
-          aria-label={`Fshi „${book.title}“`}
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.2rem] text-muted ring-1 ring-line hover:bg-danger/10 hover:text-danger"
+          onClick={() => onMore(book)}
+          aria-label={`Më shumë për „${book.title}“: hua, ndrysho, fshi`}
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.2rem] text-ink ring-1 ring-line hover:bg-soft"
         >
-          <TrashIcon className="h-6 w-6" />
+          <DotsIcon className="h-7 w-7" />
         </button>
       </div>
     </li>

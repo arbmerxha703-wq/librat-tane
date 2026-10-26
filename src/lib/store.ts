@@ -20,6 +20,11 @@ export interface Store {
   photoUrls(paths: string[]): Promise<Record<string, string>>;
   getMap(): Promise<LibraryMap>;
   setMap(map: LibraryMap): Promise<void>;
+  /** Small shared settings (e.g. loans), stored as JSON by key. */
+  getSetting<T>(key: string, fallback: T): Promise<T>;
+  setSetting(key: string, value: unknown): Promise<void>;
+  /** The cheapest possible query, so the free database never counts as idle. */
+  ping(): Promise<void>;
 }
 
 const EMPTY_MAP: LibraryMap = { zones: [] };
@@ -94,9 +99,22 @@ class SupabaseStore implements Store {
   }
 
   async setMap(map: LibraryMap) {
-    const { error } = await this.db
-      .from(SETTINGS)
-      .upsert({ key: "map", value: map, updated_at: new Date().toISOString() });
+    await this.setSetting("map", map);
+  }
+
+  async getSetting<T>(key: string, fallback: T) {
+    const { data, error } = await this.db.from(SETTINGS).select("value").eq("key", key).maybeSingle();
+    if (error) throw error;
+    return (data?.value as T | undefined) ?? fallback;
+  }
+
+  async setSetting(key: string, value: unknown) {
+    const { error } = await this.db.from(SETTINGS).upsert({ key, value, updated_at: new Date().toISOString() });
+    if (error) throw error;
+  }
+
+  async ping() {
+    const { error } = await this.db.from(TABLE).select("id").limit(1);
     if (error) throw error;
   }
 }
@@ -160,6 +178,18 @@ class MemoryStore implements Store {
   async setMap(map: LibraryMap) {
     this.map = map;
   }
+
+  private settings = new Map<string, unknown>();
+
+  async getSetting<T>(key: string, fallback: T) {
+    return (this.settings.get(key) as T | undefined) ?? fallback;
+  }
+
+  async setSetting(key: string, value: unknown) {
+    this.settings.set(key, value);
+  }
+
+  async ping() {}
 }
 
 const globalForStore = globalThis as unknown as { libratStore?: Store };

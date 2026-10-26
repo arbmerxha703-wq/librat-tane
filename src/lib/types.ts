@@ -12,6 +12,9 @@ export type Book = {
   /** Left and right edge of the spine in that photo, 0–1000 of its width. */
   x0?: number | null;
   x1?: number | null;
+  /** Who borrowed the book and when (ISO date), if it is out on loan. */
+  loaned_to?: string;
+  loaned_at?: string;
 };
 
 export type NewBook = {

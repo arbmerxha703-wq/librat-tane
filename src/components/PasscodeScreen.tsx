@@ -26,7 +26,7 @@ export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) 
   }
 
   return (
-    <main className="hero flex min-h-dvh flex-col justify-center px-5 py-10">
+    <main className="hero flex min-h-dvh flex-col justify-center px-5 pt-[max(2.5rem,env(safe-area-inset-top))] pb-10">
       <div className="animate-rise mx-auto flex w-full max-w-md flex-col items-center text-center">
         <Monogram className="h-24 w-24 text-3xl" />
         <p className="eyebrow gold-text mt-7">Biblioteka e shtëpisë</p>

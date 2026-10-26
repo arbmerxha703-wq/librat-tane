@@ -100,6 +100,37 @@ export const MapPinIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const DotsIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="5" cy="12" r="1.4" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+    <circle cx="19" cy="12" r="1.4" fill="currentColor" />
+  </Svg>
+);
+
+export const PencilIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z" />
+    <path d="m13.5 6.5 4 4" />
+  </Svg>
+);
+
+/** A book going out: "E dhashë hua". */
+export const LendIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 19V6a2 2 0 0 1 2-2h7v15H6a2 2 0 0 0-2 2" />
+    <path d="M16 12h6M19 9l3 3-3 3" />
+  </Svg>
+);
+
+/** A book coming back: "U kthye". */
+export const ReturnIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </Svg>
+);
+
 export const ArrowDownIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12 4v15M6 13l6 6 6-6" />

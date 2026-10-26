@@ -1,11 +1,13 @@
 import { bookSchema, json, requirePasscode, serverError } from "@/lib/api";
+import { getLoans, withLoans } from "@/lib/loans";
 import { getStore } from "@/lib/store";
 
 export async function GET(req: Request) {
   const denied = requirePasscode(req);
   if (denied) return denied;
   try {
-    return json({ books: await getStore().list() });
+    const [books, loans] = await Promise.all([getStore().list(), getLoans()]);
+    return json({ books: withLoans(books, loans) });
   } catch (err) {
     return serverError(err);
   }

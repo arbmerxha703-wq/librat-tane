@@ -7,14 +7,16 @@ const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["lati
 
 export const metadata: Metadata = {
   title: "Librat Tanë",
-  description: "Katalogu i bibliotekës së shtëpisë",
-  appleWebApp: { title: "Librat Tanë", capable: true },
+  description: "Biblioteka e shtëpisë — gjeni çdo libër në sekonda.",
+  // From the home screen the emerald header runs up under the status bar.
+  appleWebApp: { title: "Librat Tanë", capable: true, statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
+  viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6efe0" },
-    { media: "(prefers-color-scheme: dark)", color: "#1b1611" },
+    { media: "(prefers-color-scheme: light)", color: "#134a3e" },
+    { media: "(prefers-color-scheme: dark)", color: "#10382f" },
   ],
 };
 

@@ -72,6 +72,32 @@ export function spineColor(seed: string): string {
 
 export const booksLabel = (n: number) => (n === 1 ? "1 libër" : `${n} libra`);
 
+/** A loan older than this is shown as overdue. */
+const LATE_AFTER_DAYS = 30;
+
+export function loanInfo(book: Book): { text: string; late: boolean } | null {
+  if (!book.loaned_to || !book.loaned_at) return null;
+  const days = Math.max(0, Math.floor((Date.now() - new Date(book.loaned_at).getTime()) / 86_400_000));
+  const since = days === 0 ? "që sot" : days === 1 ? "prej 1 dite" : `prej ${days} ditësh`;
+  return { text: `Te ${book.loaned_to} · ${since}`, late: days > LATE_AFTER_DAYS };
+}
+
+const BORROWERS_KEY = "librat-borrowers";
+
+/** Names used before on this phone, so lending to the same person is one tap. */
+export function getBorrowers(): string[] {
+  try {
+    return JSON.parse(read(BORROWERS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function rememberBorrower(name: string) {
+  const list = [name, ...getBorrowers().filter((n) => n.toLowerCase() !== name.toLowerCase())].slice(0, 8);
+  write(BORROWERS_KEY, JSON.stringify(list));
+}
+
 /**
  * Opens a camera photo. An <img> handles large phone photos and their rotation more reliably than
  * createImageBitmap on iOS; the load event is used because img.decode() never settles in some browsers.
