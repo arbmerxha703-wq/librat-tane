@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/client";
-import { BookOpenIcon, EyeIcon, EyeOffIcon, LockIcon } from "./icons";
+import { EyeIcon, EyeOffIcon, LockIcon, Monogram } from "./icons";
 
 export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) => void; notice?: string }) {
   const [code, setCode] = useState("");
@@ -26,18 +26,18 @@ export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) 
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
-      <div className="animate-rise flex flex-col items-center text-center">
-        <span className="flex h-20 w-20 items-center justify-center rounded-3xl bg-accent text-accent-ink shadow-card">
-          <BookOpenIcon className="h-11 w-11" />
-        </span>
-        <h1 className="mt-5 font-serif text-5xl font-bold">Librat Tanë</h1>
-        <p className="mt-2 text-lg text-muted">Biblioteka e shtëpisë — gjeni çdo libër në sekonda.</p>
+    <main className="hero flex min-h-dvh flex-col justify-center px-5 py-10">
+      <div className="animate-rise mx-auto flex w-full max-w-md flex-col items-center text-center">
+        <Monogram className="h-24 w-24 text-3xl" />
+        <p className="eyebrow gold-text mt-7">Biblioteka e shtëpisë</p>
+        <h1 className="mt-2 font-serif text-5xl font-bold">Librat Tanë</h1>
+        <p className="mt-3 text-lg text-white/75">Çdo libër, në vendin e vet.</p>
+        <span aria-hidden className="gold-rule mt-6 block w-40" />
       </div>
 
-      <form onSubmit={submit} className="animate-rise mt-8 rounded-3xl border border-line bg-card p-6 shadow-card">
+      <form onSubmit={submit} className="animate-rise mx-auto mt-8 w-full max-w-md rounded-[2rem] bg-card p-6 text-ink shadow-[0_30px_60px_-25px_rgba(0,0,0,0.6)]">
         <label htmlFor="passcode" className="mb-1 flex items-center gap-2 text-xl font-semibold">
-          <LockIcon className="h-6 w-6 text-accent" />
+          <LockIcon className="h-6 w-6 text-gold" />
           Shkruani kodin
         </label>
         <p className="mb-4 text-base text-muted">Kodi kërkohet vetëm një herë në këtë telefon.</p>
@@ -53,7 +53,7 @@ export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) 
             autoFocus
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            className="h-18 w-full rounded-2xl border border-line bg-bg pr-14 pl-3 text-center text-xl outline-none focus:border-accent focus:ring-4 focus:ring-accent/15"
+            className="h-18 w-full rounded-2xl border border-line bg-bg pr-14 pl-3 text-center text-xl outline-none focus:border-gold focus:ring-4 focus:ring-gold/20"
           />
           <button
             type="button"

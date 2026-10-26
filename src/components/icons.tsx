@@ -82,6 +82,17 @@ export const LockIcon = (p: IconProps) => (
   </Svg>
 );
 
+/** "LT" monogram in a champagne-gold ring — the app's emblem. */
+export function Monogram({ className = "h-14 w-14 text-xl" }: { className?: string }) {
+  return (
+    <span aria-hidden className={`gold-foil inline-flex shrink-0 rounded-full p-[2px] shadow-lg ${className}`}>
+      <span className="flex h-full w-full items-center justify-center rounded-full bg-[var(--hero-2)]">
+        <span className="gold-text font-serif font-bold tracking-wide">LT</span>
+      </span>
+    </span>
+  );
+}
+
 export const MapPinIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" />

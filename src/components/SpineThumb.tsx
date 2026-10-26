@@ -14,7 +14,7 @@ export function SpineThumb({ url, x0, x1 }: { url: string; x0: number; x1: numbe
   const width = ((b - a) / frac) * 100;
 
   return (
-    <div className="relative h-40 overflow-hidden bg-black">
+    <div className="relative h-44 overflow-hidden bg-black">
       {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL */}
       <img
         src={url}
@@ -27,7 +27,7 @@ export function SpineThumb({ url, x0, x1 }: { url: string; x0: number; x1: numbe
       <div className="absolute inset-y-0 left-0 bg-black/55" style={{ width: `${left}%` }} />
       <div className="absolute inset-y-0 right-0 bg-black/55" style={{ width: `${100 - left - width}%` }} />
       <div
-        className="absolute inset-y-1 rounded ring-[3px] ring-[#ffd166] shadow-[0_0_18px_rgba(255,209,102,0.75)]"
+        className="absolute inset-y-1.5 rounded-md ring-2 ring-[#f0dca8] shadow-[0_0_22px_rgba(240,220,168,0.7)]"
         style={{ left: `${left}%`, width: `${width}%` }}
       />
     </div>

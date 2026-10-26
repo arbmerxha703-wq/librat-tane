@@ -10,7 +10,7 @@ import { AddBookSheet } from "./AddBookSheet";
 import { ShelfScanSheet } from "./ShelfScanSheet";
 import { LocateSheet } from "./LocateSheet";
 import { ConfirmDialog } from "./Modal";
-import { BookOpenIcon, CameraIcon, CheckIcon, CloseIcon, PlusIcon, SearchIcon, ShelvesIcon, SparkleIcon } from "./icons";
+import { BookOpenIcon, CameraIcon, CheckIcon, CloseIcon, Monogram, PlusIcon, SearchIcon, ShelvesIcon, SparkleIcon } from "./icons";
 
 type Filter = "all" | "read" | "unread";
 
@@ -197,43 +197,50 @@ export function Library() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-40">
-      {/* Top bar */}
-      <header className="flex items-center justify-between gap-4 pt-5">
-        <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-accent-ink shadow-card">
-            <BookOpenIcon className="h-7 w-7" />
-          </span>
-          <div className="leading-tight">
-            <p className="font-serif text-2xl font-bold">Librat Tanë</p>
-            <p className="text-sm font-medium text-muted">Biblioteka e shtëpisë</p>
-          </div>
+      {/* Hero */}
+      <header className="hero relative -mx-4 overflow-hidden rounded-b-[2.5rem] px-6 pt-6 pb-20 shadow-card">
+        <div className="flex items-center justify-between gap-4">
+          <Monogram />
+          {books && (
+            <div className="text-right">
+              <p className="eyebrow text-[#f0dca8]/80">Koleksioni</p>
+              <p className="font-serif text-3xl leading-none font-bold tabular-nums">
+                {counts.all} <span className="text-lg font-semibold text-white/70">{counts.all === 1 ? "libër" : "libra"}</span>
+              </p>
+            </div>
+          )}
         </div>
-        {books && (
-          <div className="text-right leading-tight">
-            <p className="font-serif text-2xl font-bold tabular-nums">{counts.all}</p>
-            <p className="text-sm font-medium text-muted">{counts.all === 1 ? "libër" : "libra"}</p>
+        <p className="eyebrow gold-text mt-9">Biblioteka e shtëpisë</p>
+        <h1 className="mt-2 font-serif text-[2.75rem] leading-[1.02] font-bold">Librat Tanë</h1>
+        <p className="mt-3 text-xl text-white/75">Çfarë libri kërkoni sot?</p>
+        {books && books.length > 0 && (
+          <div className="mt-5 flex items-center gap-4 text-base text-white/75">
+            <span>
+              <strong className="font-semibold text-white">{counts.read}</strong> të lexuar
+            </span>
+            <span aria-hidden className="h-4 w-px bg-white/25" />
+            <span>
+              <strong className="font-semibold text-white">{shelves.length}</strong> {shelves.length === 1 ? "raft" : "rafte"}
+            </span>
           </div>
         )}
       </header>
 
-      <h1 className="mt-8 font-serif text-[2rem] leading-tight font-bold sm:text-4xl">Çfarë libri kërkoni?</h1>
-      <p className="mt-1 text-lg text-muted">Shkruani një pjesë të titullit ose të autorit.</p>
-
-      {/* Search */}
-      <div className="sticky top-0 z-20 -mx-4 bg-bg/90 px-4 pt-3 pb-3 backdrop-blur-md">
+      {/* Search: floats over the edge of the hero, then stays on top while scrolling */}
+      <div className="sticky top-3 z-20 -mt-9">
         <div className="relative">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-5 h-7 w-7 -translate-y-1/2 text-muted" />
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-5 h-7 w-7 -translate-y-1/2 text-gold" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="p.sh. Kadare"
+            placeholder="Titulli ose autori…"
             aria-label="Kërko titullin ose autorin"
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
             enterKeyHint="search"
-            className="h-17 w-full rounded-2xl border border-line bg-card pr-16 pl-15 text-2xl shadow-card outline-none placeholder:text-muted/60 focus:border-accent focus:ring-4 focus:ring-accent/15 [&::-webkit-search-cancel-button]:hidden"
+            className="h-18 w-full rounded-[1.4rem] bg-card pr-16 pl-15 text-2xl shadow-[0_18px_40px_-18px_rgba(10,30,24,0.55)] ring-1 ring-line outline-none placeholder:text-muted/60 focus:ring-2 focus:ring-gold [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button
@@ -249,8 +256,8 @@ export function Library() {
       </div>
 
       {/* Filters */}
-      <div className="mt-1 flex flex-col gap-3">
-        <div role="radiogroup" aria-label="Shfaq" className="grid grid-cols-3 gap-1 rounded-2xl bg-soft p-1">
+      <div className="mt-6 flex flex-col gap-3">
+        <div role="radiogroup" aria-label="Shfaq" className="grid grid-cols-3 gap-2">
           {filters.map((f) => (
             <button
               key={f.value}
@@ -258,12 +265,14 @@ export function Library() {
               role="radio"
               aria-checked={filter === f.value}
               onClick={() => setFilter(f.value)}
-              className={`flex h-15 flex-col items-center justify-center rounded-xl leading-tight transition-colors ${
-                filter === f.value ? "bg-card text-ink shadow-card" : "text-muted hover:text-ink"
+              className={`flex h-16 flex-col items-center justify-center rounded-2xl leading-tight transition-all ${
+                filter === f.value
+                  ? "bg-accent text-accent-ink shadow-card"
+                  : "bg-card text-muted ring-1 ring-line hover:text-ink"
               }`}
             >
               <span className="text-lg font-semibold whitespace-nowrap">{f.label}</span>
-              <span className={`text-sm font-semibold tabular-nums ${filter === f.value ? "text-accent" : ""}`}>{f.count}</span>
+              <span className={`text-sm font-semibold tabular-nums ${filter === f.value ? "text-on-accent-soft" : ""}`}>{f.count}</span>
             </button>
           ))}
         </div>
@@ -278,7 +287,7 @@ export function Library() {
             onClick={() => setByShelf((v) => !v)}
             className="flex h-12 shrink-0 items-center gap-3 rounded-full px-2 text-lg font-semibold"
           >
-            <ShelvesIcon className={`h-6 w-6 ${byShelf ? "text-accent" : "text-muted"}`} />
+            <ShelvesIcon className={`h-6 w-6 ${byShelf ? "text-gold" : "text-muted"}`} />
             Sipas rafteve
             <span aria-hidden className={`relative h-7 w-12 rounded-full transition-colors ${byShelf ? "bg-accent" : "bg-line"}`}>
               <span
@@ -328,9 +337,15 @@ export function Library() {
           <div className="flex flex-col gap-8">
             {groups.map(([shelf, list]) => (
               <section key={shelf} aria-label={`Rafti ${shelf}`}>
-                <h2 className="mb-3 flex items-baseline justify-between gap-3 border-b border-line pb-2">
-                  <span className="font-serif text-2xl font-bold">Rafti {shelf}</span>
-                  <span className="text-base font-medium text-muted">{booksLabel(list.length)}</span>
+                <h2 className="mb-4">
+                  <span className="flex items-end justify-between gap-3">
+                    <span>
+                      <span className="eyebrow block text-gold">Rafti</span>
+                      <span className="font-serif text-4xl leading-none font-bold">{shelf}</span>
+                    </span>
+                    <span className="text-base font-medium text-muted">{booksLabel(list.length)}</span>
+                  </span>
+                  <span aria-hidden className="gold-rule mt-3 block" />
                 </h2>
                 <BookList books={list} query={query} onToggleRead={toggleRead} onDelete={setToDelete} onLocate={setLocating} photoUrls={photoUrls} />
               </section>
@@ -360,20 +375,20 @@ export function Library() {
       )}
 
       {books && books.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/85 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-lg">
-          <div className="mx-auto grid max-w-2xl grid-cols-2 gap-3">
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="pointer-events-auto mx-auto grid max-w-xl grid-cols-2 gap-2 rounded-[1.9rem] bg-card/75 p-2 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.45)] ring-1 ring-line backdrop-blur-xl">
             <button
               type="button"
               onClick={() => setScanningShelf(true)}
-              className="flex h-16 items-center justify-center gap-2 rounded-2xl border border-line bg-card text-xl font-bold text-ink shadow-card active:scale-[0.99]"
+              className="flex h-16 items-center justify-center gap-2 rounded-[1.4rem] text-xl font-bold text-ink hover:bg-soft active:scale-[0.99]"
             >
-              <CameraIcon className="h-7 w-7 shrink-0 text-accent" />
+              <CameraIcon className="h-7 w-7 shrink-0 text-gold" />
               Foto e raftit
             </button>
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-card active:scale-[0.99]"
+              className="flex h-16 items-center justify-center gap-2 rounded-[1.4rem] bg-accent text-xl font-bold text-accent-ink shadow-card active:scale-[0.99]"
             >
               <PlusIcon className="h-7 w-7 shrink-0" />
               Shto libër
@@ -385,7 +400,7 @@ export function Library() {
       {toast && (
         <div
           role="status"
-          className="animate-rise fixed inset-x-4 bottom-28 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink px-5 py-4 text-lg text-bg shadow-xl"
+          className="animate-rise fixed inset-x-4 bottom-32 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink px-5 py-4 text-lg text-bg shadow-xl"
         >
           <CheckIcon className="h-6 w-6 shrink-0" />
           <span>{toast}</span>

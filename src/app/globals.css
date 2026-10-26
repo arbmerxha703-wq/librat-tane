@@ -1,53 +1,63 @@
 @import "tailwindcss";
 
 /*
- * "Classic library" palette: warm paper, deep library green, brass gold.
+ * "Maison" palette: ivory, deep emerald and champagne gold — a quiet luxury library.
  * Token names (accent, brass…) are shared by every component, so the palette lives only here.
  */
 :root {
-  --bg: #f4f1ea;
-  --card: #fffdf9;
-  --ink: #1d1b17;
-  --muted: #6b6458;
-  --accent: #1f5144;
-  --accent-strong: #173e34;
-  --accent-ink: #ffffff;
-  --line: #e3dccf;
-  --soft: #ece6da;
-  --danger: #b42318;
+  --bg: #f7f4ee;
+  --card: #ffffff;
+  --ink: #15130f;
+  --muted: #6d665b;
+  --accent: #0f3d33;
+  --accent-strong: #0b2f27;
+  --accent-ink: #fbf7ee;
+  --line: #e7e0d2;
+  --soft: #efe9de;
+  --danger: #a8231a;
   --danger-ink: #ffffff;
-  --ok: #2f6b4f;
-  --brass-bg: #f5ead2;
-  --brass-line: #e2cc9a;
-  --brass-ink: #5f4310;
-  --gold: #c9973f;
-  --hero-1: #23594b;
-  --hero-2: #173e34;
-  --shadow: 0 1px 2px rgba(29, 27, 23, 0.05), 0 8px 24px -14px rgba(29, 27, 23, 0.25);
+  --ok: #2b6a4d;
+  --brass-bg: #f7efdd;
+  --brass-line: #dcc493;
+  --brass-ink: #6a4b15;
+  --gold: #b48a4a;
+  --gold-1: #f0dca8;
+  --gold-2: #c09a57;
+  --gold-3: #8f6a2f;
+  --hero-1: #134a3e;
+  /* number on the selected filter button (emerald in light, gold in dark) */
+  --on-accent-soft: #e2c88f;
+  --hero-2: #0a2a23;
+  --shadow: 0 1px 1px rgba(21, 19, 15, 0.04), 0 12px 32px -18px rgba(21, 19, 15, 0.28), 0 2px 6px -2px rgba(21, 19, 15, 0.06);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #101412;
-    --card: #181e1b;
-    --ink: #ece7dd;
-    --muted: #a39c8f;
-    --accent: #86c9ad;
-    --accent-strong: #a4dcc4;
-    --accent-ink: #0d1813;
-    --line: #2a322e;
-    --soft: #202824;
-    --danger: #f2867b;
+    --bg: #0b0e0d;
+    --card: #131816;
+    --ink: #f1ebdf;
+    --muted: #a69d8d;
+    /* In the dark the primary actions turn gold. */
+    --accent: #d5b475;
+    --accent-strong: #e6c98c;
+    --accent-ink: #15110a;
+    --line: #252c29;
+    --soft: #1b2120;
+    --danger: #f08a7f;
     --danger-ink: #1a0d0b;
-    --ok: #86c9a3;
-    --brass-bg: #2a2417;
-    --brass-line: #54451f;
-    --brass-ink: #ecc985;
-    --gold: #d9ae5f;
-    --hero-1: #1b4237;
-    --hero-2: #10291f;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -16px rgba(0, 0, 0, 0.7);
+    --ok: #8fcfaa;
+    --brass-bg: #221d13;
+    --brass-line: #57462a;
+    --brass-ink: #ead09a;
+    --gold: #d5b475;
+    --gold-1: #f3e2b4;
+    --gold-2: #cfa962;
+    --gold-3: #9b7638;
+    --hero-1: #10382f;
+  --on-accent-soft: #5a4318;
+    --hero-2: #06140f;
+    --shadow: 0 1px 1px rgba(0, 0, 0, 0.4), 0 16px 40px -20px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.03);
     color-scheme: dark;
   }
 }
@@ -69,6 +79,8 @@
   --color-brass-line: var(--brass-line);
   --color-brass-ink: var(--brass-ink);
   --color-gold: var(--gold);
+  --color-gold-2: var(--gold-2);
+  --color-on-accent-soft: var(--on-accent-soft);
   --shadow-card: var(--shadow);
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-serif: var(--font-playfair), Georgia, serif;
@@ -82,11 +94,12 @@ html {
 
 body {
   background-color: var(--bg);
-  background-image: radial-gradient(ellipse 90% 40% at 50% -8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent);
+  background-image: radial-gradient(ellipse 120% 50% at 50% -10%, color-mix(in srgb, var(--gold) 10%, transparent), transparent);
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans);
   font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
 }
 
 :focus-visible {
@@ -94,12 +107,40 @@ body {
   outline-offset: 2px;
 }
 
-/* Deep library-green surface (passcode banner, shelf headings) */
-.wood {
+/* Deep emerald surface with soft light: hero, passcode screen, empty state */
+.wood,
+.hero {
   background:
-    radial-gradient(120% 90% at 0% 0%, rgba(255, 255, 255, 0.08), transparent 55%),
-    linear-gradient(150deg, var(--hero-1), var(--hero-2));
-  color: #f4efe4;
+    radial-gradient(90% 70% at 85% -10%, rgba(240, 220, 168, 0.18), transparent 60%),
+    radial-gradient(70% 60% at -10% 110%, rgba(255, 255, 255, 0.06), transparent 60%),
+    linear-gradient(160deg, var(--hero-1), var(--hero-2));
+  color: #f6f0e3;
+}
+
+/* Champagne-gold foil */
+.gold-foil {
+  background: linear-gradient(135deg, var(--gold-1), var(--gold-2) 45%, var(--gold-1) 62%, var(--gold-3));
+}
+
+.gold-text {
+  background: linear-gradient(135deg, var(--gold-1), var(--gold-2) 50%, var(--gold-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Small uppercase label with wide spacing */
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+/* A thin gold rule */
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-2), transparent);
 }
 
 /* Brass label: where a book stands */
