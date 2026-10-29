@@ -1,4 +1,4 @@
-# Librat Tanë 📚
+# BookNest 📚
 
 A home-library catalog for phones. Type part of a title or author and the app
 tells you exactly where the book is: **Rafti 3 · Vendi 5** (shelf 3, position 5).

@@ -6,10 +6,10 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin", "latin-ext"] 
 const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin", "latin-ext"] });
 
 export const metadata: Metadata = {
-  title: "Librat Tanë",
+  title: "BookNest",
   description: "Biblioteka e shtëpisë — gjeni çdo libër në sekonda.",
   // From the home screen the emerald header runs up under the status bar.
-  appleWebApp: { title: "Librat Tanë", capable: true, statusBarStyle: "black-translucent" },
+  appleWebApp: { title: "BookNest", capable: true, statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {

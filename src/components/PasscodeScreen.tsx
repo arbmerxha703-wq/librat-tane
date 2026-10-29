@@ -30,7 +30,7 @@ export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) 
       <div className="animate-rise mx-auto flex w-full max-w-md flex-col items-center text-center">
         <AppLogo className="h-28 w-28" />
         <p className="eyebrow gold-text mt-7">Biblioteka e shtëpisë</p>
-        <h1 className="mt-2 font-serif text-5xl font-bold">Librat Tanë</h1>
+        <h1 className="mt-2 font-serif text-5xl font-bold">BookNest</h1>
         <p className="mt-3 text-lg text-white/75">Çdo libër, në vendin e vet.</p>
         <span aria-hidden className="gold-rule mt-6 block w-40" />
       </div>

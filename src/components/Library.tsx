@@ -277,7 +277,7 @@ export function Library() {
           )}
         </div>
         <p className="eyebrow gold-text mt-9">Biblioteka e shtëpisë</p>
-        <h1 className="mt-2 font-serif text-[2.75rem] leading-[1.02] font-bold">Librat Tanë</h1>
+        <h1 className="mt-2 font-serif text-[2.75rem] leading-[1.02] font-bold">BookNest</h1>
         <p className="mt-3 text-xl text-white/75">Çfarë libri kërkoni sot?</p>
         {books && books.length > 0 && (
           <div className="mt-5 flex items-center gap-4 text-base text-white/75">
