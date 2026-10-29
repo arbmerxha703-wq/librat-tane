@@ -82,14 +82,11 @@ export const LockIcon = (p: IconProps) => (
   </Svg>
 );
 
-/** "LT" monogram in a champagne-gold ring — the app's emblem. */
-export function Monogram({ className = "h-14 w-14 text-xl" }: { className?: string }) {
+/** The app's logo: books on a gold shelf in a gold-framed tile (public/logo.png). */
+export function AppLogo({ className = "h-14 w-14" }: { className?: string }) {
   return (
-    <span aria-hidden className={`gold-foil inline-flex shrink-0 rounded-full p-[2px] shadow-lg ${className}`}>
-      <span className="flex h-full w-full items-center justify-center rounded-full bg-[var(--hero-2)]">
-        <span className="gold-text font-serif font-bold tracking-wide">LT</span>
-      </span>
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element -- tiny static image, same file as the app icon
+    <img src="/logo.png" alt="" aria-hidden width={512} height={512} className={`shrink-0 drop-shadow-lg ${className}`} />
   );
 }
 

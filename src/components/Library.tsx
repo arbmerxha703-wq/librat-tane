@@ -12,7 +12,7 @@ import { LocateSheet } from "./LocateSheet";
 import { BookMenuSheet } from "./BookMenuSheet";
 import { EditBookSheet } from "./EditBookSheet";
 import { ConfirmDialog } from "./Modal";
-import { BookOpenIcon, CameraIcon, CheckIcon, ChevronRightIcon, CloseIcon, LendIcon, Monogram, PlusIcon, SearchIcon, ShelvesIcon, SparkleIcon } from "./icons";
+import { BookOpenIcon, CameraIcon, CheckIcon, ChevronRightIcon, CloseIcon, LendIcon, AppLogo, PlusIcon, SearchIcon, ShelvesIcon, SparkleIcon } from "./icons";
 
 type Filter = "all" | "read" | "unread" | "loaned";
 
@@ -266,7 +266,7 @@ export function Library() {
       {/* Hero */}
       <header className="hero relative -mx-4 overflow-hidden rounded-b-[2.5rem] px-6 pt-[max(1.5rem,calc(env(safe-area-inset-top)+0.75rem))] pb-20 shadow-card">
         <div className="flex items-center justify-between gap-4">
-          <Monogram />
+          <AppLogo className="h-16 w-16" />
           {books && (
             <div className="text-right">
               <p className="eyebrow text-[#f0dca8]/80">Koleksioni</p>

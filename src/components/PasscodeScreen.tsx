@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/client";
-import { EyeIcon, EyeOffIcon, LockIcon, Monogram } from "./icons";
+import { AppLogo, EyeIcon, EyeOffIcon, LockIcon } from "./icons";
 
 export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) => void; notice?: string }) {
   const [code, setCode] = useState("");
@@ -28,7 +28,7 @@ export function PasscodeScreen({ onUnlock, notice }: { onUnlock: (code: string) 
   return (
     <main className="hero flex min-h-dvh flex-col justify-center px-5 pt-[max(2.5rem,env(safe-area-inset-top))] pb-10">
       <div className="animate-rise mx-auto flex w-full max-w-md flex-col items-center text-center">
-        <Monogram className="h-24 w-24 text-3xl" />
+        <AppLogo className="h-28 w-28" />
         <p className="eyebrow gold-text mt-7">Biblioteka e shtëpisë</p>
         <h1 className="mt-2 font-serif text-5xl font-bold">Librat Tanë</h1>
         <p className="mt-3 text-lg text-white/75">Çdo libër, në vendin e vet.</p>
