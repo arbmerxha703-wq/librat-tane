@@ -1,8 +1,8 @@
 import type { Book } from "./types";
 import { normalize } from "./normalize";
 import { SHELF_TILES } from "./tiles";
+import { accessToken, getSession, refreshSession, setSession } from "./session";
 
-const PASSCODE_KEY = "librat-passcode";
 const LAST_SHELF_KEY = "librat-last-shelf";
 
 function read(key: string): string | null {
@@ -22,8 +22,6 @@ function write(key: string, value: string | null) {
   }
 }
 
-export const getSavedPasscode = () => read(PASSCODE_KEY);
-export const savePasscode = (code: string | null) => write(PASSCODE_KEY, code);
 export const getLastShelf = () => read(LAST_SHELF_KEY) ?? "";
 export const saveLastShelf = (shelf: string) => write(LAST_SHELF_KEY, shelf);
 
@@ -38,16 +36,42 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(path: string, passcode: string, init: RequestInit = {}): Promise<T> {
-  let res: Response;
+const OFFLINE = "Nuk ka lidhje me internetin.";
+
+async function send(path: string, init: RequestInit, token: string | null): Promise<Response> {
   try {
-    res = await fetch(path, {
+    return await fetch(path, {
       ...init,
-      headers: { "content-type": "application/json", "x-passcode": passcode, ...init.headers },
+      headers: {
+        "content-type": "application/json",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...init.headers,
+      },
       cache: "no-store",
     });
   } catch {
-    throw new ApiError("Nuk ka lidhje me internetin.", 0);
+    throw new ApiError(OFFLINE, 0);
+  }
+}
+
+/**
+ * Calls the app's server as the signed-in account. When the server no longer accepts the session it
+ * is refreshed once; if that fails too, the account is signed out on this phone (the app then shows
+ * the sign-in screen).
+ */
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = async (fresh: boolean) => {
+    try {
+      return fresh ? ((await refreshSession())?.access_token ?? null) : await accessToken();
+    } catch {
+      throw new ApiError(OFFLINE, 0);
+    }
+  };
+  let res = await send(path, init, await token(false));
+  if (res.status === 401 && getSession()) {
+    const fresh = await token(true);
+    if (fresh) res = await send(path, init, fresh);
+    if (res.status === 401) setSession(null);
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(body.error ?? "Diçka shkoi keq.", res.status, body.retryAfter);

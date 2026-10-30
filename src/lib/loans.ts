@@ -1,5 +1,5 @@
 import "server-only";
-import { getStore } from "./store";
+import type { Store } from "./store";
 import type { Book } from "./types";
 
 /**
@@ -11,16 +11,16 @@ type Loans = Record<string, Loan>;
 
 const KEY = "loans";
 
-export function getLoans(): Promise<Loans> {
-  return getStore().getSetting<Loans>(KEY, {});
+export function getLoans(store: Store): Promise<Loans> {
+  return store.getSetting<Loans>(KEY, {});
 }
 
-export async function setLoan(bookId: string, loan: Loan | null): Promise<void> {
-  const loans = await getLoans();
+export async function setLoan(store: Store, bookId: string, loan: Loan | null): Promise<void> {
+  const loans = await getLoans(store);
   if (loan) loans[bookId] = loan;
   else if (bookId in loans) delete loans[bookId];
   else return;
-  await getStore().setSetting(KEY, loans);
+  await store.setSetting(KEY, loans);
 }
 
 /** Adds loaned_to / loaned_at to books that are out on loan. */

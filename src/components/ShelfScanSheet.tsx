@@ -23,13 +23,11 @@ const MAX_WAITS = 3;
 export function ShelfScanSheet({
   books,
   shelves,
-  passcode,
   onSaved,
   onClose,
 }: {
   books: Book[];
   shelves: string[];
-  passcode: string;
   onSaved: (books: Book[]) => void;
   onClose: () => void;
 }) {
@@ -84,7 +82,7 @@ export function ShelfScanSheet({
       let result: ScanResult | null = null;
       for (let attempt = 0; !result; attempt++) {
         try {
-          result = await api<ScanResult>("/api/scan-shelf", passcode, { method: "POST", body: payload });
+          result = await api<ScanResult>("/api/scan-shelf", { method: "POST", body: payload });
         } catch (err) {
           // The free photo-reading service allows about one shelf photo a minute: wait, then try again.
           if (!(err instanceof ApiError && err.status === 429 && attempt < MAX_WAITS)) throw err;
@@ -147,7 +145,7 @@ export function ShelfScanSheet({
         x0: d.x0,
         x1: d.x1,
       }));
-      const { books: saved } = await api<{ books: Book[] }>("/api/books/bulk", passcode, {
+      const { books: saved } = await api<{ books: Book[] }>("/api/books/bulk", {
         method: "POST",
         body: JSON.stringify({ books: payload }),
       });
@@ -196,7 +194,7 @@ export function ShelfScanSheet({
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-lg text-accent-ink">1</span>
               Ku është rafti?
             </h3>
-            <ShelfPicker passcode={passcode} shelves={shelves} shelf={shelf} onPick={changeShelf} />
+            <ShelfPicker shelves={shelves} shelf={shelf} onPick={changeShelf} />
 
             <details className="rounded-2xl border border-line bg-soft/40 px-4 py-3">
               <summary className="cursor-pointer text-base font-semibold text-muted">Ose zgjidhni raftin me numër</summary>

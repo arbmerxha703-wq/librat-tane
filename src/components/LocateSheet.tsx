@@ -11,13 +11,13 @@ import { ShelfOnMap } from "./LibraryMap";
  * "Ku është?" — pictures first, so nobody has to count shelves: the library photo with a red circle on
  * the shelf, then the shelf photo with the book lit up. The numbers stay as a small note.
  */
-export function LocateSheet({ book, passcode, onClose }: { book: Book; passcode: string; onClose: () => void }) {
+export function LocateSheet({ book, onClose }: { book: Book; onClose: () => void }) {
   const [shelfUrl, setShelfUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!book.photo_path) return;
     let alive = true;
-    api<{ urls: Record<string, string> }>("/api/photos", passcode, {
+    api<{ urls: Record<string, string> }>("/api/photos", {
       method: "POST",
       body: JSON.stringify({ paths: [book.photo_path] }),
     }).then(
@@ -27,7 +27,7 @@ export function LocateSheet({ book, passcode, onClose }: { book: Book; passcode:
     return () => {
       alive = false;
     };
-  }, [book.photo_path, passcode]);
+  }, [book.photo_path]);
 
   const highlight = book.x0 != null && book.x1 != null ? { x0: book.x0, x1: book.x1 } : null;
 
@@ -44,7 +44,7 @@ export function LocateSheet({ book, passcode, onClose }: { book: Book; passcode:
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-base text-white">1</span>
             Rafti — te rrethi i kuq
           </h4>
-          <ShelfOnMap passcode={passcode} shelf={book.shelf} />
+          <ShelfOnMap shelf={book.shelf} />
         </section>
 
         <section className="flex flex-col gap-2">

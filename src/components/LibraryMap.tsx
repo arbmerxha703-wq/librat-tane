@@ -9,19 +9,19 @@ import { CameraIcon, PlusIcon } from "./icons";
 type ZoneWithUrl = Zone & { url: string | null };
 type MapState = { zones: ZoneWithUrl[] };
 
-function useLibraryMap(passcode: string) {
+function useLibraryMap() {
   const [map, setMap] = useState<MapState | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     let alive = true;
-    api<MapState>("/api/map", passcode).then(
+    api<MapState>("/api/map").then(
       (m) => alive && setMap(m),
       (err) => alive && setError((err as Error).message),
     );
     return () => {
       alive = false;
     };
-  }, [passcode]);
+  }, []);
   return { map, setMap, error, setError };
 }
 
@@ -93,8 +93,8 @@ function ZonePhoto({
  * "Ku është?" — the library photo that contains this shelf, with a red circle on it.
  * Shows nothing when the shelf has not been marked.
  */
-export function ShelfOnMap({ passcode, shelf }: { passcode: string; shelf: string }) {
-  const { map } = useLibraryMap(passcode);
+export function ShelfOnMap({ shelf }: { shelf: string }) {
+  const { map } = useLibraryMap();
   const zone = map?.zones.find((z) => findMark(z, shelf));
   if (!map) return null;
   if (!zone) {
@@ -117,19 +117,17 @@ export function ShelfOnMap({ passcode, shelf }: { passcode: string; shelf: strin
  * Tapping near an existing shelf picks it; tapping elsewhere creates the next shelf there.
  */
 export function ShelfPicker({
-  passcode,
   shelves,
   shelf,
   onPick,
 }: {
-  passcode: string;
   /** Shelves that already have books. */
   shelves: string[];
   /** The currently chosen shelf ("" if none). */
   shelf: string;
   onPick: (shelf: string) => void;
 }) {
-  const { map, setMap, error, setError } = useLibraryMap(passcode);
+  const { map, setMap, error, setError } = useLibraryMap();
   const [zoneId, setZoneId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [newName, setNewName] = useState("");
@@ -146,7 +144,7 @@ export function ShelfPicker({
     try {
       const photo = await photoToBase64(file, 2000);
       const name = replace?.name ?? (newName.trim() || `Pjesa ${zones.length + 1}`);
-      const next = await api<MapState>("/api/map", passcode, {
+      const next = await api<MapState>("/api/map", {
         method: "POST",
         body: JSON.stringify({ photo, name, zoneId: replace?.id }),
       });
@@ -174,7 +172,7 @@ export function ShelfPicker({
     onPick(name);
     try {
       setMap(
-        await api<MapState>("/api/map", passcode, {
+        await api<MapState>("/api/map", {
           method: "PATCH",
           body: JSON.stringify({ zoneId: zone.id, shelf: name, point }),
         }),
@@ -187,7 +185,7 @@ export function ShelfPicker({
   async function removeZone(z: ZoneWithUrl) {
     if (!window.confirm(`Ta heqim foton "${z.name}"? Librat nuk preken.`)) return;
     try {
-      setMap(await api<MapState>("/api/map", passcode, { method: "DELETE", body: JSON.stringify({ zoneId: z.id }) }));
+      setMap(await api<MapState>("/api/map", { method: "DELETE", body: JSON.stringify({ zoneId: z.id }) }));
       setZoneId(null);
     } catch (err) {
       setError((err as Error).message);

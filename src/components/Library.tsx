@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Book, NewBook } from "@/lib/types";
 import { compareByLocation, compareShelves, matchesQuery } from "@/lib/normalize";
-import { api, ApiError, booksLabel, getSavedPasscode, rememberBorrower, savePasscode } from "@/lib/client";
-import { PasscodeScreen } from "./PasscodeScreen";
+import { api, ApiError, booksLabel, rememberBorrower } from "@/lib/client";
+import { getSession, onSessionChange, setSession, takeRecoveryLink } from "@/lib/session";
+import { AuthScreen } from "./AuthScreen";
 import { BookCard } from "./BookCard";
 import { AddBookSheet } from "./AddBookSheet";
 import { ShelfScanSheet } from "./ShelfScanSheet";
@@ -17,7 +18,11 @@ import { BookOpenIcon, CameraIcon, CheckIcon, ChevronRightIcon, CloseIcon, LendI
 type Filter = "all" | "read" | "unread" | "loaned";
 
 export function Library() {
-  const [passcode, setPasscode] = useState<string | null>(getSavedPasscode);
+  // A "forgot password" link signs in first, so read it before the account below.
+  const [recovery, setRecovery] = useState(takeRecoveryLink);
+  // The signed-in email; null shows the sign-in screen.
+  const [account, setAccount] = useState<string | null>(() => getSession()?.email ?? null);
+  const [signingOut, setSigningOut] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [lockNotice, setLockNotice] = useState("");
   const [books, setBooks] = useState<Book[] | null>(null);
@@ -37,31 +42,43 @@ export function Library() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
 
-  const lock = useCallback((notice = "") => {
-    savePasscode(null);
-    setPasscode(null);
-    setBooks(null);
+  // Signing in or out here, in another tab, or the session ending all come through here.
+  useEffect(
+    () =>
+      onSessionChange(() => {
+        const session = getSession();
+        setAccount(session?.email ?? null);
+        if (!session) {
+          setBooks(null);
+          setPhotoUrls({});
+        }
+      }),
+    [],
+  );
+
+  const signOut = useCallback((notice = "") => {
     setLockNotice(notice);
+    setSession(null);
   }, []);
 
   const handleError = useCallback(
     (err: unknown) => {
-      if (err instanceof ApiError && err.status === 401) lock("Kodi ka ndryshuar. Shkruajeni përsëri.");
+      if (err instanceof ApiError && err.status === 401) signOut("Hyni përsëri në llogarinë tuaj.");
       else setToast((err as Error).message);
     },
-    [lock],
+    [signOut],
   );
 
   useEffect(() => {
-    if (!passcode) return;
+    if (account === null) return;
     const run = () =>
-      api<{ books: Book[] }>("/api/books", passcode).then(
+      api<{ books: Book[] }>("/api/books").then(
         ({ books }) => {
           setBooks(books);
           setLoadError("");
         },
         (err) => {
-          if (err instanceof ApiError && err.status === 401) lock();
+          if (err instanceof ApiError && err.status === 401) signOut("Hyni përsëri në llogarinë tuaj.");
           else setLoadError((err as Error).message);
         },
       );
@@ -70,7 +87,7 @@ export function Library() {
     const onVisible = () => document.visibilityState === "visible" && run();
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [passcode, lock, reloadTick]);
+  }, [account, signOut, reloadTick]);
 
   useEffect(() => {
     if (!toast) return;
@@ -114,13 +131,13 @@ export function Library() {
     [visible, photoUrls],
   );
   useEffect(() => {
-    if (!passcode || missingPaths.length === 0) return;
+    if (account === null || missingPaths.length === 0) return;
     let alive = true;
     const batches = [];
     for (let i = 0; i < missingPaths.length; i += 20) batches.push(missingPaths.slice(i, i + 20));
     Promise.all(
       batches.map((paths) =>
-        api<{ urls: Record<string, string> }>("/api/photos", passcode, { method: "POST", body: JSON.stringify({ paths }) }),
+        api<{ urls: Record<string, string> }>("/api/photos", { method: "POST", body: JSON.stringify({ paths }) }),
       ),
     ).then(
       (results) => {
@@ -134,7 +151,7 @@ export function Library() {
     return () => {
       alive = false;
     };
-  }, [missingPaths, passcode]);
+  }, [missingPaths, account]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Book[]>();
@@ -145,10 +162,9 @@ export function Library() {
   const sampleCount = books?.filter((b) => b.is_sample).length ?? 0;
 
   async function toggleRead(book: Book) {
-    if (!passcode) return;
     setBooks((prev) => prev?.map((b) => (b.id === book.id ? { ...b, is_read: !b.is_read } : b)) ?? null);
     try {
-      await api(`/api/books/${book.id}`, passcode, {
+      await api(`/api/books/${book.id}`, {
         method: "PATCH",
         body: JSON.stringify({ is_read: !book.is_read }),
       });
@@ -162,10 +178,10 @@ export function Library() {
   const putBook = (book: Book) => setBooks((prev) => prev?.map((b) => (b.id === book.id ? book : b)) ?? null);
 
   async function saveEdit(patch: Partial<NewBook>) {
-    if (!passcode || !editing) return;
+    if (!editing) return;
     setBusy(true);
     try {
-      const { book } = await api<{ book: Book }>(`/api/books/${editing.id}`, passcode, {
+      const { book } = await api<{ book: Book }>(`/api/books/${editing.id}`, {
         method: "PATCH",
         body: JSON.stringify(patch),
       });
@@ -180,10 +196,9 @@ export function Library() {
   }
 
   async function lend(book: Book, to: string) {
-    if (!passcode) return;
     setBusy(true);
     try {
-      const { loan } = await api<{ loan: { to: string; at: string } }>(`/api/books/${book.id}/loan`, passcode, {
+      const { loan } = await api<{ loan: { to: string; at: string } }>(`/api/books/${book.id}/loan`, {
         method: "PUT",
         body: JSON.stringify({ to }),
       });
@@ -199,10 +214,9 @@ export function Library() {
   }
 
   async function giveBack(book: Book) {
-    if (!passcode) return;
     setBusy(true);
     try {
-      await api(`/api/books/${book.id}/loan`, passcode, { method: "DELETE" });
+      await api(`/api/books/${book.id}/loan`, { method: "DELETE" });
       putBook({ ...book, loaned_to: undefined, loaned_at: undefined });
       setMenuFor(null);
       setToast(`„${book.title}“ u kthye në raft.`);
@@ -214,10 +228,10 @@ export function Library() {
   }
 
   async function confirmDelete() {
-    if (!passcode || !toDelete) return;
+    if (!toDelete) return;
     setBusy(true);
     try {
-      await api(`/api/books/${toDelete.id}`, passcode, { method: "DELETE" });
+      await api(`/api/books/${toDelete.id}`, { method: "DELETE" });
       setBooks((prev) => prev?.filter((b) => b.id !== toDelete.id) ?? null);
       setToast(`„${toDelete.title}“ u fshi.`);
       setToDelete(null);
@@ -229,10 +243,9 @@ export function Library() {
   }
 
   async function changeSamples(method: "POST" | "DELETE") {
-    if (!passcode) return;
     setBusy(true);
     try {
-      const { books } = await api<{ books: Book[] }>("/api/samples", passcode, { method });
+      const { books } = await api<{ books: Book[] }>("/api/samples", { method });
       setBooks(books);
       setToast(method === "POST" ? "U shtuan librat shembull." : "Librat shembull u hoqën.");
       setRemovingSamples(false);
@@ -243,14 +256,27 @@ export function Library() {
     }
   }
 
-  if (passcode === null) {
+  if (account !== null && recovery === "reset") {
     return (
-      <PasscodeScreen
-        notice={lockNotice}
-        onUnlock={(code) => {
-          savePasscode(code);
-          setPasscode(code);
+      <AuthScreen
+        initialMode="reset"
+        onPasswordSet={() => {
+          setRecovery(null);
+          setToast("Fjalëkalimi i ri u ruajt.");
         }}
+      />
+    );
+  }
+
+  if (account === null) {
+    return (
+      <AuthScreen
+        key={lockNotice}
+        notice={
+          recovery === "expired"
+            ? "Lidhja për fjalëkalimin ka skaduar ose është përdorur. Kërkoni një të re."
+            : lockNotice
+        }
       />
     );
   }
@@ -473,6 +499,20 @@ export function Library() {
         </div>
       )}
 
+      <footer className="mt-12 flex flex-col items-center gap-3 text-center text-base text-muted">
+        <span aria-hidden className="gold-rule block w-24" />
+        <p>
+          Jeni brenda si <strong className="font-semibold break-all text-ink">{account || "kjo llogari"}</strong>
+        </p>
+        <button
+          type="button"
+          onClick={() => setSigningOut(true)}
+          className="h-12 rounded-full px-5 text-lg font-semibold text-muted ring-1 ring-line hover:text-danger"
+        >
+          Dil nga llogaria
+        </button>
+      </footer>
+
       {books && books.length > 0 && (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="pointer-events-auto mx-auto grid max-w-xl grid-cols-2 gap-2 rounded-[1.9rem] bg-card/75 p-2 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.45)] ring-1 ring-line backdrop-blur-xl">
@@ -510,7 +550,6 @@ export function Library() {
         <AddBookSheet
           books={books ?? []}
           shelves={shelves}
-          passcode={passcode}
           onClose={() => setAdding(false)}
           onSaved={(book) => {
             setBooks((prev) => [...(prev ?? []), book]);
@@ -523,7 +562,6 @@ export function Library() {
         <ShelfScanSheet
           books={books ?? []}
           shelves={shelves}
-          passcode={passcode}
           onClose={() => setScanningShelf(false)}
           onSaved={(saved) => setBooks((prev) => [...(prev ?? []), ...saved])}
         />
@@ -557,9 +595,7 @@ export function Library() {
         />
       )}
 
-      {locating && passcode && (
-        <LocateSheet book={locating} passcode={passcode} onClose={() => setLocating(null)} />
-      )}
+      {locating && <LocateSheet book={locating} onClose={() => setLocating(null)} />}
 
       {toDelete && (
         <ConfirmDialog
@@ -573,6 +609,20 @@ export function Library() {
           busy={busy}
           onConfirm={confirmDelete}
           onCancel={() => setToDelete(null)}
+        />
+      )}
+
+      {signingOut && (
+        <ConfirmDialog
+          title="Të dilni nga llogaria?"
+          message="Librat nuk fshihen. Për t’u kthyer, ju duhen sërish email-i dhe fjalëkalimi."
+          confirmLabel="Po, dil"
+          busy={false}
+          onConfirm={() => {
+            setSigningOut(false);
+            signOut();
+          }}
+          onCancel={() => setSigningOut(false)}
         />
       )}
 

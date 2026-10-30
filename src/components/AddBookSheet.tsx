@@ -13,13 +13,11 @@ const inputClass =
 export function AddBookSheet({
   books,
   shelves,
-  passcode,
   onSaved,
   onClose,
 }: {
   books: Book[];
   shelves: string[];
-  passcode: string;
   onSaved: (book: Book) => void;
   onClose: () => void;
 }) {
@@ -52,7 +50,7 @@ export function AddBookSheet({
     setMessage(null);
     try {
       const image = await photoToBase64(file);
-      const result = await api<{ title: string; author: string }>("/api/scan", passcode, {
+      const result = await api<{ title: string; author: string }>("/api/scan", {
         method: "POST",
         body: JSON.stringify({ image, mediaType: "image/jpeg" }),
       });
@@ -75,7 +73,7 @@ export function AddBookSheet({
     setSaving(true);
     setMessage(null);
     try {
-      const { book } = await api<{ book: Book }>("/api/books", passcode, {
+      const { book } = await api<{ book: Book }>("/api/books", {
         method: "POST",
         body: JSON.stringify({
           title: title.trim(),

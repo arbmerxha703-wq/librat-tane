@@ -8,7 +8,8 @@ tells you exactly where the book is: **Rafti 3 · Vendi 5** (shelf 3, position 5
   the fast way to catalogue 100+ books (a few photos instead of typing each book).
 - Or add a single book by hand / by photographing its cover.
 - Filters: Të gjitha / Lexuar / Pa lexuar, and a "Sipas rafteve" (by shelf) view.
-- One shared catalog for every device, protected by a single shared passcode (no accounts).
+- Accounts (email + password): each account has its own library. Several phones can sign in to the
+  same account to share one catalog.
 - Large text and buttons, light and dark mode, all UI in Albanian.
 
 Stack: Next.js (App Router) · TypeScript · Tailwind CSS · Supabase (Postgres) · Gemini / Groq / Claude (vision) · Vercel.
@@ -63,6 +64,18 @@ values ('photos', 'photos', false)
 on conflict (id) do nothing;
 ```
 
+And this third part, which gives every book an owner (each account sees only its own library):
+
+```sql
+alter table public.books
+  add column if not exists owner uuid references auth.users (id) on delete cascade;
+create index if not exists books_owner_idx on public.books (owner, created_at);
+```
+
+Then in **Authentication → URL Configuration**, set **Site URL** to the app's address (e.g.
+`https://booknest.vercel.app`) and add `https://<your-app>/**` under **Redirect URLs**, so the
+"forgot password" email opens the app.
+
 3. Go to **Project Settings → API** and copy:
    - **Project URL** → `SUPABASE_URL`
    - **service_role** secret key → `SUPABASE_SERVICE_ROLE_KEY` (keep this secret; it never reaches the browser)
@@ -73,7 +86,6 @@ Copy `.env.example` to `.env.local` and fill it in:
 
 | Variable | What it is |
 | --- | --- |
-| `APP_PASSCODE` | The shared code the family types once on each phone (e.g. a 4–6 digit number). |
 | `SUPABASE_URL` | Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key (server-side only). |
 | `GEMINI_API_KEY` | **Free**, recommended photo reading (reads small spine print best). From [aistudio.google.com](https://aistudio.google.com) → Get API key. |
@@ -95,14 +107,14 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>, type the passcode, and tap **Shto 10 libra shembull** to try it with
+Open <http://localhost:3000>, create an account, and tap **Shto 10 libra shembull** to try it with
 example books. Remove them any time with **Hiq librat shembull** — your own books are never touched.
 
 ## 4. Deploy to Vercel
 
 1. Push this folder to a GitHub repository.
 2. In Vercel: **Add New → Project**, import the repository (framework is detected automatically).
-3. Under **Environment Variables**, add `APP_PASSCODE`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` (or `GROQ_API_KEY`).
+3. Under **Environment Variables**, add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` (or `GROQ_API_KEY`).
 4. Click **Deploy**. Open the URL on each phone, and use the browser's **Add to Home Screen** so it opens like an app.
 
 ## Cataloguing a big library quickly
@@ -123,16 +135,20 @@ shows the library photo with a red circle on the shelf, and the shelf photo with
 
 ## How it works
 
-- `src/app/api/*` — server routes. Every request must carry the passcode (`x-passcode` header);
-  the Supabase and Anthropic keys stay on the server.
+- `src/app/api/*` — server routes. Every request carries the account's session
+  (`Authorization: Bearer …`, checked with Supabase Auth) and only touches that account's books, settings
+  and photos (`src/lib/store.ts`); the Supabase and AI keys stay on the server.
   - `books` — list / add, `books/[id]` — mark read / delete, `samples` — add or remove the example books,
     `books/bulk` — saves many books at once, `scan-shelf` — sends a shelf photo to Claude and returns the books
-    in left-to-right order, `scan` — reads a single cover and returns `{ title, author }`, `auth` — checks a passcode.
+    in left-to-right order, `scan` — reads a single cover and returns `{ title, author }`, `auth` — sign up, sign in, refresh the session, forgotten password.
 - `src/lib/vision.ts` — sends photos to Gemini (`generateContent`), Groq (OpenAI-compatible chat API) or Claude (`claude-opus-5-5`,
   structured output) and validates the JSON with zod.
 - `src/components/Library.tsx` — the main screen. The whole catalog is loaded once and searched in the browser,
   so results appear instantly as you type. It refreshes when the app is reopened, to pick up books added on another phone.
 - `src/lib/normalize.ts` — accent-insensitive matching (`ë→e`, `ç→c`, …).
 - Cover photos are shrunk in the browser before upload and are not stored anywhere.
+- `src/lib/session.ts` — keeps the session on the phone and refreshes it before it expires, so people stay
+  signed in until they tap **Dil nga llogaria**.
 
-Changing the passcode: update `APP_PASSCODE` in Vercel and redeploy; each phone will ask for the new code.
+Accounts are created on the server already confirmed (no confirmation email). Supabase's free email
+service only sends a few emails an hour, which is enough for forgotten passwords in a family app.

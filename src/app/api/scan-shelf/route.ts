@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { jpegSchema, json, requirePasscode, serverError } from "@/lib/api";
+import { jpegSchema, json, serverError } from "@/lib/api";
+import { requireLibrary } from "@/lib/auth";
 import { extractTileRows, mergeTiles, SHELF_PROMPT, TILES } from "@/lib/shelfScan";
-import { getStore } from "@/lib/store";
 import { readImages, VisionError } from "@/lib/vision";
 
 export const maxDuration = 120;
@@ -14,8 +14,8 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const denied = requirePasscode(req);
-  if (denied) return denied;
+  const store = await requireLibrary(req);
+  if (store instanceof Response) return store;
 
   const parsed = requestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return json({ error: "Fotografia nuk u pranua." }, 400);
@@ -37,7 +37,6 @@ export async function POST(req: Request) {
     let photoPath: string | null = null;
     let photoUrl: string | null = null;
     try {
-      const store = getStore();
       photoPath = await store.savePhoto("shelves", photo);
       photoUrl = (await store.photoUrls([photoPath]))[photoPath] ?? null;
     } catch (err) {

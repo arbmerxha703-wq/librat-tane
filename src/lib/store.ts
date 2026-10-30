@@ -20,11 +20,9 @@ export interface Store {
   photoUrls(paths: string[]): Promise<Record<string, string>>;
   getMap(): Promise<LibraryMap>;
   setMap(map: LibraryMap): Promise<void>;
-  /** Small shared settings (e.g. loans), stored as JSON by key. */
+  /** Small settings of this library (e.g. loans), stored as JSON by key. */
   getSetting<T>(key: string, fallback: T): Promise<T>;
   setSetting(key: string, value: unknown): Promise<void>;
-  /** The cheapest possible query, so the free database never counts as idle. */
-  ping(): Promise<void>;
 }
 
 const EMPTY_MAP: LibraryMap = { zones: [] };
@@ -37,11 +35,21 @@ function toMap(value: unknown): LibraryMap {
   return EMPTY_MAP;
 }
 
+/** Photos saved before accounts existed have no owner folder: "shelves/….jpg". */
+const isLegacyPath = (path: string) => /^(shelves|map)\//.test(path);
+
+/**
+ * One account's library. Every query is limited to the account's own books, settings and photos;
+ * the service key bypasses row-level security, so this class is what keeps libraries apart.
+ */
 class SupabaseStore implements Store {
-  constructor(private db: SupabaseClient) {}
+  constructor(
+    private db: SupabaseClient,
+    private owner: string,
+  ) {}
 
   async list() {
-    const { data, error } = await this.db.from(TABLE).select("*").order("created_at");
+    const { data, error } = await this.db.from(TABLE).select("*").eq("owner", this.owner).order("created_at");
     if (error) throw error;
     return data as Book[];
   }
@@ -52,30 +60,36 @@ class SupabaseStore implements Store {
   }
 
   async addMany(books: NewBook[], isSample = false) {
-    const rows = books.map((b) => ({ ...b, is_sample: isSample }));
+    const rows = books.map((b) => ({ ...b, is_sample: isSample, owner: this.owner }));
     const { data, error } = await this.db.from(TABLE).insert(rows).select("*");
     if (error) throw error;
     return data as Book[];
   }
 
   async update(id: string, patch: Partial<NewBook>) {
-    const { data, error } = await this.db.from(TABLE).update(patch).eq("id", id).select("*").single();
+    const { data, error } = await this.db
+      .from(TABLE)
+      .update(patch)
+      .eq("id", id)
+      .eq("owner", this.owner)
+      .select("*")
+      .single();
     if (error) throw error;
     return data as Book;
   }
 
   async remove(id: string) {
-    const { error } = await this.db.from(TABLE).delete().eq("id", id);
+    const { error } = await this.db.from(TABLE).delete().eq("id", id).eq("owner", this.owner);
     if (error) throw error;
   }
 
   async removeSamples() {
-    const { error } = await this.db.from(TABLE).delete().eq("is_sample", true);
+    const { error } = await this.db.from(TABLE).delete().eq("is_sample", true).eq("owner", this.owner);
     if (error) throw error;
   }
 
   async savePhoto(folder: "shelves" | "map", base64: string) {
-    const path = `${folder}/${crypto.randomUUID()}.jpg`;
+    const path = `${this.owner}/${folder}/${crypto.randomUUID()}.jpg`;
     const { error } = await this.db.storage
       .from(BUCKET)
       .upload(path, Buffer.from(base64, "base64"), { contentType: "image/jpeg" });
@@ -83,7 +97,22 @@ class SupabaseStore implements Store {
     return path;
   }
 
+  /** This account's photos among `paths`: its own folder, or older photos its books or map use. */
+  private async ownPaths(paths: string[]) {
+    const own = paths.filter((p) => p.startsWith(`${this.owner}/`));
+    const legacy = paths.filter(isLegacyPath);
+    if (legacy.length === 0) return own;
+    const [{ data, error }, map] = await Promise.all([
+      this.db.from(TABLE).select("photo_path").eq("owner", this.owner).in("photo_path", legacy),
+      this.getMap(),
+    ]);
+    if (error) throw error;
+    const used = new Set([...(data ?? []).map((r) => r.photo_path as string), ...map.zones.map((z) => z.path)]);
+    return [...own, ...legacy.filter((p) => used.has(p))];
+  }
+
   async photoUrls(paths: string[]) {
+    paths = await this.ownPaths(paths);
     if (paths.length === 0) return {};
     const { data, error } = await this.db.storage.from(BUCKET).createSignedUrls(paths, URL_TTL);
     if (error) throw error;
@@ -93,28 +122,28 @@ class SupabaseStore implements Store {
   }
 
   async getMap() {
-    const { data, error } = await this.db.from(SETTINGS).select("value").eq("key", "map").maybeSingle();
-    if (error) throw error;
-    return toMap(data?.value);
+    return toMap(await this.getSetting<unknown>("map", null));
   }
 
   async setMap(map: LibraryMap) {
     await this.setSetting("map", map);
   }
 
+  /** Settings rows are shared by all accounts, so each key carries its owner: "loans:<owner>". */
+  private key(key: string) {
+    return `${key}:${this.owner}`;
+  }
+
   async getSetting<T>(key: string, fallback: T) {
-    const { data, error } = await this.db.from(SETTINGS).select("value").eq("key", key).maybeSingle();
+    const { data, error } = await this.db.from(SETTINGS).select("value").eq("key", this.key(key)).maybeSingle();
     if (error) throw error;
     return (data?.value as T | undefined) ?? fallback;
   }
 
   async setSetting(key: string, value: unknown) {
-    const { error } = await this.db.from(SETTINGS).upsert({ key, value, updated_at: new Date().toISOString() });
-    if (error) throw error;
-  }
-
-  async ping() {
-    const { error } = await this.db.from(TABLE).select("id").limit(1);
+    const { error } = await this.db
+      .from(SETTINGS)
+      .upsert({ key: this.key(key), value, updated_at: new Date().toISOString() });
     if (error) throw error;
   }
 }
@@ -162,7 +191,7 @@ class MemoryStore implements Store {
   }
 
   async savePhoto(folder: "shelves" | "map", base64: string) {
-    const path = `${folder}/${crypto.randomUUID()}.jpg`;
+    const path = `${MEMORY_OWNER}/${folder}/${crypto.randomUUID()}.jpg`;
     this.photos.set(path, `data:image/jpeg;base64,${base64}`);
     return path;
   }
@@ -188,28 +217,42 @@ class MemoryStore implements Store {
   async setSetting(key: string, value: unknown) {
     this.settings.set(key, value);
   }
-
-  async ping() {}
 }
 
-const globalForStore = globalThis as unknown as { libratStore?: Store };
+/** The only account when trying changes with `npm run dev:memory` (no Supabase, no real sign-in). */
+export const MEMORY_OWNER = "00000000-0000-4000-8000-000000000000";
 
-export function getStore(): Store {
-  if (globalForStore.libratStore) return globalForStore.libratStore;
+const globalForStore = globalThis as unknown as { libratDb?: SupabaseClient | null; libratMemory?: MemoryStore };
 
+/** The service-role client, or null when the in-memory store is used. */
+export function getDb(): SupabaseClient | null {
+  if (globalForStore.libratDb !== undefined) return globalForStore.libratDb;
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  let store: Store;
   // `npm run dev:memory` tries changes without touching the real catalog.
   const forceMemory = process.env.LIBRAT_MEMORY_STORE === "1" && process.env.NODE_ENV !== "production";
   if (url && key && !forceMemory) {
-    store = new SupabaseStore(createClient(url, key, { auth: { persistSession: false } }));
+    globalForStore.libratDb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   } else if (process.env.NODE_ENV !== "production") {
     console.warn("[librat] SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing — using in-memory store.");
-    store = new MemoryStore();
+    globalForStore.libratDb = null;
   } else {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.");
   }
-  globalForStore.libratStore = store;
-  return store;
+  return globalForStore.libratDb;
+}
+
+/** The library of one account (its Supabase user id). */
+export function getStore(owner: string): Store {
+  const db = getDb();
+  if (db) return new SupabaseStore(db, owner);
+  return (globalForStore.libratMemory ??= new MemoryStore());
+}
+
+/** The cheapest possible query, so the free database never counts as idle. */
+export async function pingDatabase() {
+  const db = getDb();
+  if (!db) return;
+  const { error } = await db.from(TABLE).select("id").limit(1);
+  if (error) throw error;
 }

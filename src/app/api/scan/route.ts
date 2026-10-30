@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { jpegSchema, json, requirePasscode, serverError } from "@/lib/api";
+import { jpegSchema, json, serverError } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 import { parseLenientJson, readImages, VisionError } from "@/lib/vision";
 
 export const maxDuration = 60;
@@ -22,8 +23,8 @@ Reply with ONLY a JSON object of this shape, no other text:
 {"found": <true or false>, "title": "<title>", "author": "<author>"}`;
 
 export async function POST(req: Request) {
-  const denied = requirePasscode(req);
-  if (denied) return denied;
+  const user = await requireUser(req);
+  if (user instanceof Response) return user;
 
   const parsed = requestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return json({ error: "Fotografia nuk u pranua." }, 400);
