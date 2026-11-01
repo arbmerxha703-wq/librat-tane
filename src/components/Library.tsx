@@ -327,9 +327,9 @@ export function Library() {
   ];
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pb-40">
+    <div className="mx-auto max-w-2xl px-4 pb-40 lg:max-w-6xl lg:px-8">
       {/* Hero */}
-      <header className="hero relative -mx-4 overflow-hidden rounded-b-[2.5rem] px-6 pt-[max(1.5rem,calc(env(safe-area-inset-top)+0.75rem))] pb-20 shadow-card">
+      <header className="hero relative -mx-4 overflow-hidden rounded-b-[2.5rem] px-6 pt-[max(1.5rem,calc(env(safe-area-inset-top)+0.75rem))] pb-20 shadow-card lg:mx-0 lg:mt-8 lg:rounded-[2.5rem] lg:px-14 lg:pt-12 lg:pb-24">
         <div className="flex items-center justify-between gap-4">
           <AppLogo className="h-16 w-16" />
           {books && (
@@ -342,7 +342,7 @@ export function Library() {
           )}
         </div>
         <p className="eyebrow gold-text mt-9">Biblioteka e shtëpisë</p>
-        <h1 className="mt-2 font-serif text-[2.75rem] leading-[1.02] font-bold">BookNest</h1>
+        <h1 className="mt-2 font-serif text-[2.75rem] leading-[1.02] font-bold lg:text-6xl">BookNest</h1>
         <p className="mt-3 text-xl text-white/75">Çfarë libri kërkoni sot?</p>
         {books && books.length > 0 && (
           <div className="mt-5 flex items-center gap-4 text-base text-white/75">
@@ -358,7 +358,7 @@ export function Library() {
       </header>
 
       {/* Search: floats over the edge of the hero, then stays on top while scrolling */}
-      <div className="sticky top-3 z-20 -mt-9">
+      <div className="sticky top-3 z-20 -mt-9 lg:mx-auto lg:max-w-3xl">
         <div className="relative">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-5 h-7 w-7 -translate-y-1/2 text-gold" />
           <input
@@ -387,7 +387,11 @@ export function Library() {
       </div>
 
       {/* Libraries: each bookcase or room has its own shelves */}
-      <div className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1" role="radiogroup" aria-label="Biblioteka">
+      <div
+        className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:mt-7 lg:flex-wrap lg:justify-center lg:overflow-visible lg:px-0"
+        role="radiogroup"
+        aria-label="Biblioteka"
+      >
         {libraries.map((l) => {
           const active = l.id === library.id && !searching;
           return (
@@ -420,8 +424,8 @@ export function Library() {
       </div>
 
       {/* Filters */}
-      <div className="mt-5 flex flex-col gap-3">
-        <div role="radiogroup" aria-label="Shfaq" className="grid grid-cols-3 gap-2">
+      <div className="mt-5 flex flex-col gap-3 lg:mt-7 lg:flex-row lg:items-center lg:gap-6">
+        <div role="radiogroup" aria-label="Shfaq" className="grid grid-cols-3 gap-2 lg:w-[30rem] lg:shrink-0">
           {filters.map((f) => (
             <button
               key={f.value}
@@ -440,7 +444,7 @@ export function Library() {
             </button>
           ))}
         </div>
-        <div className="flex items-center justify-between gap-3 px-1">
+        <div className="flex items-center justify-between gap-3 px-1 lg:flex-1">
           <p className="text-lg text-muted">
             {books && (query || filter !== "all") ? booksLabel(visible.length) : ""}
             {searching && several ? " në të gjitha bibliotekat" : ""}
@@ -496,7 +500,7 @@ export function Library() {
           </button>
         ))}
 
-      <main className="mt-4" aria-live="polite">
+      <main className="mt-4 lg:mt-6" aria-live="polite">
         {books === null ? (
           <div className="py-12 text-center text-xl text-muted">
             {loadError ? (
@@ -522,7 +526,7 @@ export function Library() {
             onSamples={() => changeSamples("POST")}
           />
         ) : visible.length === 0 ? (
-          <div className="animate-rise rounded-3xl border border-dashed border-line px-6 py-12 text-center">
+          <div className="animate-rise rounded-3xl border border-dashed border-line px-6 py-12 text-center lg:mx-auto lg:max-w-2xl">
             <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-soft text-muted">
               <SearchIcon className="h-8 w-8" />
             </span>
@@ -559,7 +563,7 @@ export function Library() {
       </main>
 
       {sampleCount > 0 && (
-        <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-line bg-card p-5 shadow-card">
+        <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-line bg-card p-5 shadow-card lg:mx-auto lg:max-w-2xl">
           <p className="flex gap-3 text-lg">
             <SparkleIcon className="mt-1 h-6 w-6 shrink-0 text-gold" />
             <span>
@@ -757,7 +761,7 @@ function BookList({
   photoUrls: Record<string, string>;
 }) {
   return (
-    <ul className="flex flex-col gap-4">
+    <ul className="grid gap-4 lg:grid-cols-2 lg:gap-5 xl:grid-cols-3">
       {books.map((b, i) => (
         <BookCard
           key={b.id}
@@ -777,7 +781,7 @@ function BookList({
 
 function LoadingShelf() {
   return (
-    <div className="flex flex-col gap-4" aria-label="Duke ngarkuar librat">
+    <div className="grid gap-4 lg:grid-cols-2 lg:gap-5 xl:grid-cols-3" aria-label="Duke ngarkuar librat">
       {[0, 1, 2].map((i) => (
         <div key={i} className="h-36 animate-pulse rounded-2xl bg-soft" />
       ))}
@@ -797,7 +801,7 @@ function EmptyCatalog({
   onSamples: () => void;
 }) {
   return (
-    <div className="animate-rise overflow-hidden rounded-3xl border border-line bg-card shadow-card">
+    <div className="animate-rise overflow-hidden rounded-3xl border border-line bg-card shadow-card lg:mx-auto lg:max-w-2xl">
       <div className="wood flex flex-col items-center px-6 pt-8 pb-6 text-center">
         <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/12 ring-1 ring-white/20">
           <BookOpenIcon className="h-9 w-9" />
