@@ -28,8 +28,11 @@ export function BookCard({
   onMore,
   onLocate,
   photoUrl,
+  libraryName,
 }: {
   book: Book;
+  /** Set when there are several libraries. */
+  libraryName?: string;
   query: string;
   index: number;
   /** Link to the shelf photo this book was scanned from, if any. */
@@ -41,7 +44,7 @@ export function BookCard({
 }) {
   const color = spineColor(book.title);
   const hasPhoto = !!photoUrl && book.x0 != null && book.x1 != null;
-  const where = `Rafti ${book.shelf} · i ${book.position}-ti`;
+  const where = `${libraryName ? `${libraryName} · ` : ""}Rafti ${book.shelf} · i ${book.position}-ti`;
   const loan = loanInfo(book);
 
   return (

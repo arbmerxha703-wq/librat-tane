@@ -18,13 +18,26 @@ export const jpegSchema = z.string().min(100).max(4_000_000);
 
 const edge = z.number().int().min(0).max(1000).nullable().optional();
 
-export const bookSchema = z.object({
+/** "main", or the id given to a library added later. */
+export const libraryIdSchema = z.string().regex(/^[a-z0-9-]{1,40}$/);
+
+const bookFields = {
   title: z.string().trim().min(1).max(300),
-  author: z.string().trim().max(200).default(""),
+  author: z.string().trim().max(200),
   shelf: z.string().trim().min(1).max(50),
   position: z.coerce.number().int().min(0).max(100000),
-  is_read: z.boolean().default(false),
+  is_read: z.boolean(),
+  library_id: libraryIdSchema.optional(),
   photo_path: photoPathSchema.nullable().optional(),
   x0: edge,
   x1: edge,
+};
+
+export const bookSchema = z.object({
+  ...bookFields,
+  author: bookFields.author.default(""),
+  is_read: bookFields.is_read.default(false),
 });
+
+/** Only the fields sent are changed: no defaults here, or marking a book read would also clear its author. */
+export const bookPatchSchema = z.object(bookFields).partial();

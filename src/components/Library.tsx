@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Book, NewBook } from "@/lib/types";
+import { MAIN_LIBRARY, type Book, type LibraryInfo, type NewBook } from "@/lib/types";
 import { compareByLocation, compareShelves, matchesQuery } from "@/lib/normalize";
-import { api, ApiError, booksLabel, rememberBorrower } from "@/lib/client";
+import { api, ApiError, booksLabel, getSavedLibrary, rememberBorrower, saveLibrary } from "@/lib/client";
 import { getSession, onSessionChange, setSession, takeRecoveryLink } from "@/lib/session";
 import { AuthScreen } from "./AuthScreen";
 import { BookCard } from "./BookCard";
@@ -12,6 +12,7 @@ import { ShelfScanSheet } from "./ShelfScanSheet";
 import { LocateSheet } from "./LocateSheet";
 import { BookMenuSheet } from "./BookMenuSheet";
 import { EditBookSheet } from "./EditBookSheet";
+import { LibrariesSheet } from "./LibrariesSheet";
 import { ConfirmDialog } from "./Modal";
 import { BookOpenIcon, CameraIcon, CheckIcon, ChevronRightIcon, CloseIcon, LendIcon, AppLogo, PlusIcon, SearchIcon, ShelvesIcon, SparkleIcon } from "./icons";
 
@@ -26,6 +27,10 @@ export function Library() {
   const [reloadTick, setReloadTick] = useState(0);
   const [lockNotice, setLockNotice] = useState("");
   const [books, setBooks] = useState<Book[] | null>(null);
+  // The account's libraries (e.g. bookcases in different rooms) and the one open on this phone.
+  const [libraries, setLibraries] = useState<LibraryInfo[]>([{ id: MAIN_LIBRARY, name: "Biblioteka kryesore" }]);
+  const [chosenLibrary, setChosenLibrary] = useState(() => getSavedLibrary() ?? MAIN_LIBRARY);
+  const [managingLibraries, setManagingLibraries] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
   const [chosenFilter, setFilter] = useState<Filter>("all");
@@ -72,9 +77,10 @@ export function Library() {
   useEffect(() => {
     if (account === null) return;
     const run = () =>
-      api<{ books: Book[] }>("/api/books").then(
-        ({ books }) => {
+      api<{ books: Book[]; libraries: LibraryInfo[] }>("/api/books").then(
+        ({ books, libraries }) => {
           setBooks(books);
+          setLibraries(libraries);
           setLoadError("");
         },
         (err) => {
@@ -95,32 +101,60 @@ export function Library() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const shelves = useMemo(
-    () => [...new Set((books ?? []).map((b) => b.shelf))].sort(compareShelves),
-    [books],
+  // A library removed on another phone falls back to the first one.
+  const library = libraries.find((l) => l.id === chosenLibrary) ?? libraries[0];
+  const several = libraries.length > 1;
+  const libraryOrder = useMemo(() => new Map(libraries.map((l, i) => [l.id, i])), [libraries]);
+  /** The library's name on cards, only needed when there are several. */
+  const libraryName = useCallback(
+    (id: string) => (several ? libraries.find((l) => l.id === id)?.name : undefined),
+    [several, libraries],
   );
 
-  const counts = useMemo(() => {
-    const all = books?.length ?? 0;
-    const read = books?.filter((b) => b.is_read).length ?? 0;
-    const loaned = books?.filter((b) => b.loaned_to).length ?? 0;
-    return { all, read, unread: all - read, loaned };
+  function openLibrary(id: string) {
+    setChosenLibrary(id);
+    saveLibrary(id);
+  }
+
+  const shelvesFor = useCallback(
+    (id: string) => [...new Set((books ?? []).filter((b) => b.library_id === id).map((b) => b.shelf))].sort(compareShelves),
+    [books],
+  );
+  const libraryBooks = useMemo(() => (books ?? []).filter((b) => b.library_id === library.id), [books, library.id]);
+  const shelves = useMemo(() => shelvesFor(library.id), [shelvesFor, library.id]);
+  const perLibrary = useMemo(() => {
+    const n: Record<string, number> = {};
+    for (const b of books ?? []) n[b.library_id] = (n[b.library_id] ?? 0) + 1;
+    return n;
   }, [books]);
+
+  // Searching looks in every library, so nobody has to remember where a book is.
+  const searching = query.trim() !== "";
+  const pool = useMemo(() => (searching ? (books ?? []) : libraryBooks), [searching, books, libraryBooks]);
+
+  const counts = useMemo(() => {
+    const all = pool.length;
+    const read = pool.filter((b) => b.is_read).length;
+    const loaned = pool.filter((b) => b.loaned_to).length;
+    return { all, read, unread: all - read, loaned };
+  }, [pool]);
 
   // Once the last lent book comes back, the "lent books" view has nothing left: go back to all books.
   const filter: Filter = chosenFilter === "loaned" && counts.loaned === 0 ? "all" : chosenFilter;
 
   const visible = useMemo(() => {
-    const list = (books ?? []).filter(
+    const list = pool.filter(
       (b) =>
         (filter === "all" ||
           (filter === "loaned" ? !!b.loaned_to : filter !== "read" ? !b.is_read : b.is_read)) &&
         matchesQuery(b, query),
     );
     return byShelf
-      ? list.sort(compareByLocation)
+      ? list.sort(
+          (a, b) => (libraryOrder.get(a.library_id) ?? 0) - (libraryOrder.get(b.library_id) ?? 0) || compareByLocation(a, b),
+        )
       : list.sort((a, b) => a.title.localeCompare(b.title, "sq", { sensitivity: "base" }));
-  }, [books, filter, query, byShelf]);
+  }, [pool, filter, query, byShelf, libraryOrder]);
 
   // Fetch links for the shelf photos of the books on screen (first 60), 20 at a time.
   const missingPaths = useMemo(
@@ -154,8 +188,13 @@ export function Library() {
   }, [missingPaths, account]);
 
   const groups = useMemo(() => {
-    const map = new Map<string, Book[]>();
-    for (const b of visible) map.set(b.shelf, [...(map.get(b.shelf) ?? []), b]);
+    const map = new Map<string, { library: string; shelf: string; list: Book[] }>();
+    for (const b of visible) {
+      const key = `${b.library_id}\u0000${b.shelf}`;
+      const group = map.get(key) ?? { library: b.library_id, shelf: b.shelf, list: [] };
+      group.list.push(b);
+      map.set(key, group);
+    }
     return [...map.entries()];
   }, [visible]);
 
@@ -245,7 +284,7 @@ export function Library() {
   async function changeSamples(method: "POST" | "DELETE") {
     setBusy(true);
     try {
-      const { books } = await api<{ books: Book[] }>("/api/samples", { method });
+      const { books } = await api<{ books: Book[] }>(`/api/samples?library=${encodeURIComponent(library.id)}`, { method });
       setBooks(books);
       setToast(method === "POST" ? "U shtuan librat shembull." : "Librat shembull u hoqën.");
       setRemovingSamples(false);
@@ -347,8 +386,41 @@ export function Library() {
         </div>
       </div>
 
+      {/* Libraries: each bookcase or room has its own shelves */}
+      <div className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1" role="radiogroup" aria-label="Biblioteka">
+        {libraries.map((l) => {
+          const active = l.id === library.id && !searching;
+          return (
+            <button
+              key={l.id}
+              type="button"
+              role="radio"
+              aria-checked={l.id === library.id}
+              onClick={() => {
+                openLibrary(l.id);
+                setQuery("");
+              }}
+              className={`flex h-14 shrink-0 items-center gap-2 rounded-2xl px-4 text-lg font-semibold whitespace-nowrap transition-all ${
+                active ? "bg-ink text-bg shadow-card" : "bg-card text-ink ring-1 ring-line hover:ring-gold"
+              }`}
+            >
+              {l.name}
+              <span className={`text-sm tabular-nums ${active ? "opacity-70" : "text-muted"}`}>{perLibrary[l.id] ?? 0}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => setManagingLibraries(true)}
+          className="flex h-14 shrink-0 items-center gap-1.5 rounded-2xl border-2 border-dashed border-gold/60 px-4 text-lg font-semibold whitespace-nowrap text-ink hover:bg-soft"
+        >
+          <PlusIcon className="h-5 w-5 text-gold" />
+          {several ? "Shto / ndrysho" : "Shto bibliotekë"}
+        </button>
+      </div>
+
       {/* Filters */}
-      <div className="mt-6 flex flex-col gap-3">
+      <div className="mt-5 flex flex-col gap-3">
         <div role="radiogroup" aria-label="Shfaq" className="grid grid-cols-3 gap-2">
           {filters.map((f) => (
             <button
@@ -371,6 +443,7 @@ export function Library() {
         <div className="flex items-center justify-between gap-3 px-1">
           <p className="text-lg text-muted">
             {books && (query || filter !== "all") ? booksLabel(visible.length) : ""}
+            {searching && several ? " në të gjitha bibliotekat" : ""}
           </p>
           <button
             type="button"
@@ -441,7 +514,7 @@ export function Library() {
               <LoadingShelf />
             )}
           </div>
-        ) : books.length === 0 ? (
+        ) : libraryBooks.length === 0 && !searching ? (
           <EmptyCatalog
             busy={busy}
             onAdd={() => setAdding(true)}
@@ -453,31 +526,35 @@ export function Library() {
             <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-soft text-muted">
               <SearchIcon className="h-8 w-8" />
             </span>
-            <p className="mt-4 font-serif text-2xl font-bold">Nuk u gjet asnjë libër</p>
+            <p className="mt-4 font-serif text-2xl font-bold">
+              {searching && several ? "Nuk u gjet në asnjë bibliotekë" : "Nuk u gjet asnjë libër"}
+            </p>
             <p className="mt-2 text-lg text-muted">
               {query ? "Provoni vetëm një fjalë, p.sh. mbiemrin e autorit." : "Asnjë libër në këtë listë."}
             </p>
           </div>
         ) : byShelf ? (
           <div className="flex flex-col gap-8">
-            {groups.map(([shelf, list]) => (
-              <section key={shelf} aria-label={`Rafti ${shelf}`}>
+            {groups.map(([key, { library: lib, shelf, list }]) => (
+              <section key={key} aria-label={`Rafti ${shelf}`}>
                 <h2 className="mb-4">
                   <span className="flex items-end justify-between gap-3">
                     <span>
-                      <span className="eyebrow block text-gold">Rafti</span>
+                      <span className="eyebrow block text-gold">
+                        {searching && several ? `${libraryName(lib)} · Rafti` : "Rafti"}
+                      </span>
                       <span className="font-serif text-4xl leading-none font-bold">{shelf}</span>
                     </span>
                     <span className="text-base font-medium text-muted">{booksLabel(list.length)}</span>
                   </span>
                   <span aria-hidden className="gold-rule mt-3 block" />
                 </h2>
-                <BookList books={list} query={query} onToggleRead={toggleRead} onMore={setMenuFor} onLocate={setLocating} photoUrls={photoUrls} />
+                <BookList books={list} query={query} onToggleRead={toggleRead} onMore={setMenuFor} onLocate={setLocating} photoUrls={photoUrls} libraryName={libraryName} />
               </section>
             ))}
           </div>
         ) : (
-          <BookList books={visible} query={query} onToggleRead={toggleRead} onMore={setMenuFor} onLocate={setLocating} photoUrls={photoUrls} />
+          <BookList books={visible} query={query} onToggleRead={toggleRead} onMore={setMenuFor} onLocate={setLocating} photoUrls={photoUrls} libraryName={libraryName} />
         )}
       </main>
 
@@ -513,7 +590,7 @@ export function Library() {
         </button>
       </footer>
 
-      {books && books.length > 0 && (
+      {libraryBooks.length > 0 && (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="pointer-events-auto mx-auto grid max-w-xl grid-cols-2 gap-2 rounded-[1.9rem] bg-card/75 p-2 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.45)] ring-1 ring-line backdrop-blur-xl">
             <button
@@ -548,19 +625,22 @@ export function Library() {
 
       {adding && (
         <AddBookSheet
-          books={books ?? []}
+          library={library}
+          showLibrary={several}
+          books={libraryBooks}
           shelves={shelves}
           onClose={() => setAdding(false)}
           onSaved={(book) => {
             setBooks((prev) => [...(prev ?? []), book]);
-            setToast(`„${book.title}“ u ruajt — Rafti ${book.shelf}, Vendi ${book.position}.`);
+            setToast(`„${book.title}“ u ruajt — ${several ? `${library.name}, ` : ""}Rafti ${book.shelf}, Vendi ${book.position}.`);
           }}
         />
       )}
 
       {scanningShelf && (
         <ShelfScanSheet
-          books={books ?? []}
+          library={library}
+          books={libraryBooks}
           shelves={shelves}
           onClose={() => setScanningShelf(false)}
           onSaved={(saved) => setBooks((prev) => [...(prev ?? []), ...saved])}
@@ -588,14 +668,33 @@ export function Library() {
       {editing && (
         <EditBookSheet
           book={editing}
-          shelves={shelves}
+          libraries={libraries}
+          shelvesFor={shelvesFor}
           busy={busy}
           onSave={saveEdit}
           onClose={() => setEditing(null)}
         />
       )}
 
-      {locating && <LocateSheet book={locating} onClose={() => setLocating(null)} />}
+      {locating && (
+        <LocateSheet book={locating} libraryName={libraryName(locating.library_id)} onClose={() => setLocating(null)} />
+      )}
+
+      {managingLibraries && (
+        <LibrariesSheet
+          libraries={libraries}
+          counts={perLibrary}
+          onSaved={(list, added) => {
+            setLibraries(list);
+            if (added) {
+              openLibrary(added.id);
+              setQuery("");
+              setToast(`U shtua „${added.name}“. Fotografoni raftet e saj ose shtoni libra.`);
+            }
+          }}
+          onClose={() => setManagingLibraries(false)}
+        />
+      )}
 
       {toDelete && (
         <ConfirmDialog
@@ -647,9 +746,11 @@ function BookList({
   onMore,
   onLocate,
   photoUrls,
+  libraryName,
 }: {
   books: Book[];
   query: string;
+  libraryName: (id: string) => string | undefined;
   onToggleRead: (b: Book) => void;
   onMore: (b: Book) => void;
   onLocate: (b: Book) => void;
@@ -667,6 +768,7 @@ function BookList({
           onMore={onMore}
           onLocate={onLocate}
           photoUrl={b.photo_path ? photoUrls[b.photo_path] || null : null}
+          libraryName={libraryName(b.library_id)}
         />
       ))}
     </ul>

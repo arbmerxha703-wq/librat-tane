@@ -11,7 +11,16 @@ import { ShelfOnMap } from "./LibraryMap";
  * "Ku është?" — pictures first, so nobody has to count shelves: the library photo with a red circle on
  * the shelf, then the shelf photo with the book lit up. The numbers stay as a small note.
  */
-export function LocateSheet({ book, onClose }: { book: Book; onClose: () => void }) {
+export function LocateSheet({
+  book,
+  libraryName,
+  onClose,
+}: {
+  book: Book;
+  /** Set when there are several libraries. */
+  libraryName?: string;
+  onClose: () => void;
+}) {
   const [shelfUrl, setShelfUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,7 +53,7 @@ export function LocateSheet({ book, onClose }: { book: Book; onClose: () => void
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-base text-white">1</span>
             Rafti — te rrethi i kuq
           </h4>
-          <ShelfOnMap shelf={book.shelf} />
+          <ShelfOnMap library={book.library_id} shelf={book.shelf} />
         </section>
 
         <section className="flex flex-col gap-2">
@@ -69,6 +78,11 @@ export function LocateSheet({ book, onClose }: { book: Book; onClose: () => void
         </section>
 
         <p className="rounded-xl bg-soft px-4 py-3 text-center text-lg">
+          {libraryName && (
+            <>
+              <strong>{libraryName}</strong> ·{" "}
+            </>
+          )}
           Rafti <strong>{book.shelf}</strong> · libri i <strong>{book.position}-të</strong> nga e majta
         </p>
       </div>

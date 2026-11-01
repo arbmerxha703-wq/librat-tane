@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Book, NewBook } from "@/lib/types";
+import type { Book, LibraryInfo, NewBook } from "@/lib/types";
 import { normalize } from "@/lib/normalize";
 import { api, ApiError, booksLabel, getLastShelf, nextPosition, prepareShelfPhoto, saveLastShelf } from "@/lib/client";
 import { Modal } from "./Modal";
@@ -21,11 +21,14 @@ const PHOTO_INPUT_ID = "shelf-photo-input";
 const MAX_WAITS = 3;
 
 export function ShelfScanSheet({
+  library,
   books,
   shelves,
   onSaved,
   onClose,
 }: {
+  /** The library being catalogued; `books` and `shelves` are that library's. */
+  library: LibraryInfo;
   books: Book[];
   shelves: string[];
   onSaved: (books: Book[]) => void;
@@ -33,8 +36,8 @@ export function ShelfScanSheet({
 }) {
   const [step, setStep] = useState<Step>("setup");
   // Start on the last shelf used on this phone; otherwise the shelf is picked on the library photo.
-  const [shelf, setShelf] = useState(getLastShelf);
-  const [startPos, setStartPos] = useState(() => nextPosition(books, getLastShelf()));
+  const [shelf, setShelf] = useState(() => getLastShelf(library.id));
+  const [startPos, setStartPos] = useState(() => nextPosition(books, getLastShelf(library.id)));
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [photo, setPhoto] = useState<{ path: string | null; url: string | null }>({ path: null, url: null });
   const [waitSeconds, setWaitSeconds] = useState(0);
@@ -141,6 +144,7 @@ export function ShelfScanSheet({
         shelf: shelf.trim(),
         position: startPos + i,
         is_read: false,
+        library_id: library.id,
         photo_path: photo.path,
         x0: d.x0,
         x1: d.x1,
@@ -149,7 +153,7 @@ export function ShelfScanSheet({
         method: "POST",
         body: JSON.stringify({ books: payload }),
       });
-      saveLastShelf(shelf.trim());
+      saveLastShelf(library.id, shelf.trim());
       onSaved(saved);
       const lastPos = startPos + drafts.length - 1;
       setLastSaved({ count: saved.length, from: startPos, to: lastPos });
@@ -194,7 +198,7 @@ export function ShelfScanSheet({
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-lg text-accent-ink">1</span>
               Ku është rafti?
             </h3>
-            <ShelfPicker shelves={shelves} shelf={shelf} onPick={changeShelf} />
+            <ShelfPicker library={library.id} shelves={shelves} shelf={shelf} onPick={changeShelf} />
 
             <details className="rounded-2xl border border-line bg-soft/40 px-4 py-3">
               <summary className="cursor-pointer text-base font-semibold text-muted">Ose zgjidhni raftin me numër</summary>

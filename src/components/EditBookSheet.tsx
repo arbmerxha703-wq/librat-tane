@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Book, NewBook } from "@/lib/types";
+import type { Book, LibraryInfo, NewBook } from "@/lib/types";
 import { normalize } from "@/lib/normalize";
 import { Modal } from "./Modal";
 import { CheckIcon, MinusIcon, PlusIcon } from "./icons";
@@ -12,25 +12,30 @@ const inputClass =
 /** Fix a title, or record that a book moved to another shelf or position. */
 export function EditBookSheet({
   book,
-  shelves,
+  libraries,
+  shelvesFor,
   busy,
   onSave,
   onClose,
 }: {
   book: Book;
-  shelves: string[];
+  libraries: LibraryInfo[];
+  /** Shelves that have books, in a given library. */
+  shelvesFor: (library: string) => string[];
   busy: boolean;
   onSave: (patch: Partial<NewBook>) => void;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState(book.title);
   const [author, setAuthor] = useState(book.author);
+  const [library, setLibrary] = useState(book.library_id);
   const [shelf, setShelf] = useState(book.shelf);
   const [position, setPosition] = useState(String(book.position));
   const [isRead, setIsRead] = useState(book.is_read);
   const [error, setError] = useState("");
 
-  const movedShelf = normalize(shelf) !== normalize(book.shelf);
+  const shelves = shelvesFor(library);
+  const movedShelf = library !== book.library_id || normalize(shelf) !== normalize(book.shelf);
 
   function save(e: React.FormEvent) {
     e.preventDefault();
@@ -44,6 +49,7 @@ export function EditBookSheet({
       shelf: shelf.trim(),
       position: Number(position),
       is_read: isRead,
+      library_id: library,
     };
     // The old shelf photo no longer shows where the book is.
     if (movedShelf) Object.assign(patch, { photo_path: null, x0: null, x1: null });
@@ -68,6 +74,26 @@ export function EditBookSheet({
 
         <div className="brass rounded-2xl p-4">
           <p className="eyebrow mb-3 opacity-80">Ku ndodhet libri?</p>
+          {libraries.length > 1 && (
+            <>
+              <p className="mb-2 text-lg font-semibold">Biblioteka</p>
+              <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Biblioteka">
+                {libraries.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => setLibrary(l.id)}
+                    aria-pressed={l.id === library}
+                    className={`min-h-12 rounded-xl px-4 text-lg font-bold ${
+                      l.id === library ? "bg-accent text-accent-ink" : "bg-card text-ink ring-1 ring-brass-line hover:ring-accent"
+                    }`}
+                  >
+                    {l.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <label htmlFor="edit-shelf" className="mb-2 block text-lg font-semibold">
             Rafti
           </label>
@@ -131,7 +157,7 @@ export function EditBookSheet({
           </div>
           {movedShelf && book.photo_path && (
             <p className="mt-3 text-base">
-              Libri po kalon në raft tjetër: fotoja e vjetër hiqet. Bëni foto raftit të ri që ta shihni prapë të ndriçuar.
+              Libri po kalon {library !== book.library_id ? "në bibliotekë tjetër" : "në raft tjetër"}: fotoja e vjetër hiqet. Bëni foto raftit të ri që ta shihni prapë të ndriçuar.
             </p>
           )}
         </div>

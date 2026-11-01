@@ -22,8 +22,15 @@ function write(key: string, value: string | null) {
   }
 }
 
-export const getLastShelf = () => read(LAST_SHELF_KEY) ?? "";
-export const saveLastShelf = (shelf: string) => write(LAST_SHELF_KEY, shelf);
+// The first library keeps the key from before there were several.
+const lastShelfKey = (library: string) => (library === "main" ? LAST_SHELF_KEY : `${LAST_SHELF_KEY}@${library}`);
+export const getLastShelf = (library: string) => read(lastShelfKey(library)) ?? "";
+export const saveLastShelf = (library: string, shelf: string) => write(lastShelfKey(library), shelf);
+
+const LIBRARY_KEY = "booknest-library";
+/** The library last opened on this phone. */
+export const getSavedLibrary = () => read(LIBRARY_KEY);
+export const saveLibrary = (id: string) => write(LIBRARY_KEY, id);
 
 export class ApiError extends Error {
   constructor(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { Book } from "@/lib/types";
+import type { Book, LibraryInfo } from "@/lib/types";
 import { normalize } from "@/lib/normalize";
 import { api, getLastShelf, nextPosition, photoToBase64, saveLastShelf } from "@/lib/client";
 import { Modal } from "./Modal";
@@ -11,11 +11,17 @@ const inputClass =
   "h-16 w-full rounded-2xl border-2 border-line bg-bg px-4 text-xl outline-none focus:border-accent";
 
 export function AddBookSheet({
+  library,
   books,
   shelves,
   onSaved,
   onClose,
+  showLibrary,
 }: {
+  /** The library the book is added to; `books` and `shelves` are that library's. */
+  library: LibraryInfo;
+  /** Set when there are several libraries, to say which one the book goes into. */
+  showLibrary: boolean;
   books: Book[];
   shelves: string[];
   onSaved: (book: Book) => void;
@@ -23,8 +29,8 @@ export function AddBookSheet({
 }) {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [shelf, setShelf] = useState(getLastShelf);
-  const [position, setPosition] = useState(() => String(nextPosition(books, getLastShelf())));
+  const [shelf, setShelf] = useState(() => getLastShelf(library.id));
+  const [position, setPosition] = useState(() => String(nextPosition(books, getLastShelf(library.id))));
   const [positionTouched, setPositionTouched] = useState(false);
   const [isRead, setIsRead] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -81,9 +87,10 @@ export function AddBookSheet({
           shelf: shelf.trim(),
           position: Number(position),
           is_read: isRead,
+          library_id: library.id,
         }),
       });
-      saveLastShelf(book.shelf);
+      saveLastShelf(library.id, book.shelf);
       onSaved(book);
       if (!addAnother) return onClose();
       // Same shelf, next slot: the usual way to catalogue a shelf book by book.
@@ -179,7 +186,9 @@ export function AddBookSheet({
         </Field>
 
         <div className="brass rounded-2xl p-4">
-          <p className="mb-3 text-sm font-bold tracking-[0.18em] uppercase opacity-80">Ku vendoset libri?</p>
+          <p className="mb-3 text-sm font-bold tracking-[0.18em] uppercase opacity-80">
+            Ku vendoset libri?{showLibrary && <span className="normal-case tracking-normal"> · {library.name}</span>}
+          </p>
 
           <label htmlFor="shelf" className="mb-2 block text-lg font-semibold">
             Rafti

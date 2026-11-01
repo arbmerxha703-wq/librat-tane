@@ -7,6 +7,8 @@ export type Book = {
   is_read: boolean;
   is_sample: boolean;
   created_at: string;
+  /** Which of the account's libraries (bookcases, rooms) the book is in; "main" for the first one. */
+  library_id: string;
   /** Photo of the shelf the book was scanned from (storage path), if any. */
   photo_path?: string | null;
   /** Left and right edge of the spine in that photo, 0–1000 of its width. */
@@ -23,10 +25,18 @@ export type NewBook = {
   shelf: string;
   position: number;
   is_read: boolean;
+  /** Left out: the first library ("main"). */
+  library_id?: string;
   photo_path?: string | null;
   x0?: number | null;
   x1?: number | null;
 };
+
+/** One of the account's libraries, e.g. a bookcase in another room. */
+export type LibraryInfo = { id: string; name: string };
+
+/** The library every book belonged to before there could be several. */
+export const MAIN_LIBRARY = "main";
 
 /** A photo of (part of) the library, with a mark (0–1 of width/height) for each shelf on it. */
 export type Zone = {

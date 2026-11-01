@@ -1,13 +1,14 @@
 import { bookSchema, json, serverError } from "@/lib/api";
 import { requireLibrary } from "@/lib/auth";
+import { getLibraries } from "@/lib/libraries";
 import { getLoans, withLoans } from "@/lib/loans";
 
 export async function GET(req: Request) {
   const store = await requireLibrary(req);
   if (store instanceof Response) return store;
   try {
-    const [books, loans] = await Promise.all([store.list(), getLoans(store)]);
-    return json({ books: withLoans(books, loans) });
+    const [books, loans, libraries] = await Promise.all([store.list(), getLoans(store), getLibraries(store)]);
+    return json({ books: withLoans(books, loans), libraries });
   } catch (err) {
     return serverError(err);
   }

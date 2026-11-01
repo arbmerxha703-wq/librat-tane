@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Book, LibraryMap, NewBook } from "./types";
+import { MAIN_LIBRARY, type Book, type LibraryMap, type NewBook } from "./types";
 
 const TABLE = "books";
 const SETTINGS = "app_settings";
@@ -18,14 +18,18 @@ export interface Store {
   savePhoto(folder: "shelves" | "map", base64: string): Promise<string>;
   /** Short-lived links the browser can load, keyed by storage path. */
   photoUrls(paths: string[]): Promise<Record<string, string>>;
-  getMap(): Promise<LibraryMap>;
-  setMap(map: LibraryMap): Promise<void>;
+  /** The photos and shelf marks of one library. */
+  getMap(library: string): Promise<LibraryMap>;
+  setMap(library: string, map: LibraryMap): Promise<void>;
   /** Small settings of this library (e.g. loans), stored as JSON by key. */
   getSetting<T>(key: string, fallback: T): Promise<T>;
   setSetting(key: string, value: unknown): Promise<void>;
 }
 
 const EMPTY_MAP: LibraryMap = { zones: [] };
+
+/** Settings key of a library's map; the first library keeps the key it had before there were several. */
+const mapKey = (library: string) => (library === MAIN_LIBRARY ? "map" : `map@${library}`);
 
 /** Reads the stored map, upgrading the earlier single-photo shape { path, marks }. */
 function toMap(value: unknown): LibraryMap {
@@ -104,7 +108,7 @@ class SupabaseStore implements Store {
     if (legacy.length === 0) return own;
     const [{ data, error }, map] = await Promise.all([
       this.db.from(TABLE).select("photo_path").eq("owner", this.owner).in("photo_path", legacy),
-      this.getMap(),
+      this.getMap(MAIN_LIBRARY),
     ]);
     if (error) throw error;
     const used = new Set([...(data ?? []).map((r) => r.photo_path as string), ...map.zones.map((z) => z.path)]);
@@ -121,12 +125,12 @@ class SupabaseStore implements Store {
     return urls;
   }
 
-  async getMap() {
-    return toMap(await this.getSetting<unknown>("map", null));
+  async getMap(library: string) {
+    return toMap(await this.getSetting<unknown>(mapKey(library), null));
   }
 
-  async setMap(map: LibraryMap) {
-    await this.setSetting("map", map);
+  async setMap(library: string, map: LibraryMap) {
+    await this.setSetting(mapKey(library), map);
   }
 
   /** Settings rows are shared by all accounts, so each key carries its owner: "loans:<owner>". */
@@ -152,7 +156,6 @@ class SupabaseStore implements Store {
 class MemoryStore implements Store {
   private books: Book[] = [];
   private photos = new Map<string, string>();
-  private map: LibraryMap = EMPTY_MAP;
 
   async list() {
     return [...this.books];
@@ -161,6 +164,7 @@ class MemoryStore implements Store {
   async add(book: NewBook, isSample = false) {
     const created: Book = {
       ...book,
+      library_id: book.library_id ?? MAIN_LIBRARY,
       id: crypto.randomUUID(),
       is_sample: isSample,
       created_at: new Date().toISOString(),
@@ -200,12 +204,12 @@ class MemoryStore implements Store {
     return Object.fromEntries(paths.filter((p) => this.photos.has(p)).map((p) => [p, this.photos.get(p)!]));
   }
 
-  async getMap() {
-    return toMap(this.map);
+  async getMap(library: string) {
+    return toMap(this.settings.get(mapKey(library)) ?? null);
   }
 
-  async setMap(map: LibraryMap) {
-    this.map = map;
+  async setMap(library: string, map: LibraryMap) {
+    this.settings.set(mapKey(library), map);
   }
 
   private settings = new Map<string, unknown>();
