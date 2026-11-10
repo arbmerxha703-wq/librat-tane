@@ -41,16 +41,22 @@ export function Library() {
   const [books, setBooks] = useState<Book[] | null>(null);
   // The account's libraries (e.g. bookcases in different rooms) and the one open on this phone.
   const [libraries, setLibraries] = useState<LibraryInfo[]>([{ id: MAIN_LIBRARY, name: "Biblioteka kryesore" }]);
-  const [chosenLibrary, setChosenLibrary] = useState(() => {
+  // Opened from a QR label: "/?library=…&shelf=…" shows one shelf, "/?library=…" the whole library by shelf.
+  const [qrLink] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return (params.get("shelf") && params.get("library")) || getSavedLibrary() || MAIN_LIBRARY;
+    const library = params.get("library");
+    if (!library) return null;
+    window.history.replaceState(null, "", "/");
+    saveLibrary(library);
+    return { library, shelf: params.get("shelf") };
   });
+  const [chosenLibrary, setChosenLibrary] = useState(() => qrLink?.library ?? getSavedLibrary() ?? MAIN_LIBRARY);
   const [managingLibraries, setManagingLibraries] = useState(false);
   const [textSize, setTextSize] = useState(getTextSize);
   const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
   const [chosenFilter, setFilter] = useState<Filter>("all");
-  const [byShelf, setByShelf] = useState(false);
+  const [byShelf, setByShelf] = useState(() => !!qrLink && !qrLink.shelf);
   const [adding, setAdding] = useState(false);
   const [scanningShelf, setScanningShelf] = useState(false);
   const [toDelete, setToDelete] = useState<Book | null>(null);
@@ -62,16 +68,9 @@ export function Library() {
   const [removingSamples, setRemovingSamples] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
-  // Opened from a shelf's QR label: "/?library=…&shelf=…" shows only that shelf.
-  const [shelfView, setShelfView] = useState<{ library: string; shelf: string } | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const shelf = params.get("shelf");
-    if (!shelf) return null;
-    const library = params.get("library") || MAIN_LIBRARY;
-    window.history.replaceState(null, "", "/");
-    saveLibrary(library);
-    return { library, shelf };
-  });
+  const [shelfView, setShelfView] = useState<{ library: string; shelf: string } | null>(() =>
+    qrLink?.shelf ? { library: qrLink.library, shelf: qrLink.shelf } : null,
+  );
 
   // Signing in or out here, in another tab, or the session ending all come through here.
   useEffect(
