@@ -79,6 +79,12 @@ alter table public.books
   add column if not exists library_id text not null default 'main';
 ```
 
+And a fifth part, for books added by barcode (the ISBN also gives the cover picture):
+
+```sql
+alter table public.books add column if not exists isbn text;
+```
+
 Then in **Authentication → URL Configuration**, set **Site URL** to the app's address (e.g.
 `https://booknest.vercel.app`) and add `https://<your-app>/**` under **Redirect URLs**, so the
 "forgot password" email opens the app.

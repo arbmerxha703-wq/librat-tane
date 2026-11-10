@@ -3,9 +3,9 @@
 import { useRef, useState } from "react";
 import type { Book, LibraryInfo } from "@/lib/types";
 import { normalize } from "@/lib/normalize";
-import { api, getLastShelf, nextPosition, photoToBase64, saveLastShelf } from "@/lib/client";
+import { api, getLastShelf, nextPosition, photoToBase64, readIsbn, saveLastShelf } from "@/lib/client";
 import { Modal } from "./Modal";
-import { CameraIcon, CheckIcon, MinusIcon, PlusIcon } from "./icons";
+import { BarcodeIcon, CameraIcon, CheckIcon, MinusIcon, PlusIcon } from "./icons";
 
 const inputClass =
   "h-16 w-full rounded-2xl border-2 border-line bg-bg px-4 text-xl outline-none focus:border-accent";
@@ -33,11 +33,15 @@ export function AddBookSheet({
   const [position, setPosition] = useState(() => String(nextPosition(books, getLastShelf(library.id))));
   const [positionTouched, setPositionTouched] = useState(false);
   const [isRead, setIsRead] = useState(false);
+  const [isbn, setIsbn] = useState<string | null>(null);
+  const [readingBarcode, setReadingBarcode] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const reading = scanning || readingBarcode;
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; kind: "error" | "info" } | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const barcodeRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   function changeShelf(value: string) {
@@ -71,6 +75,39 @@ export function AddBookSheet({
     }
   }
 
+  async function scanBarcode(file: File | undefined) {
+    if (!file) return;
+    setReadingBarcode(true);
+    setMessage(null);
+    try {
+      const code = await readIsbn(file);
+      if (!code) {
+        setMessage({
+          text: "Barkodi nuk u lexua. Fotografojeni nga afër, drejt dhe me dritë — ose fotografoni kopertinën.",
+          kind: "error",
+        });
+        return;
+      }
+      setIsbn(code);
+      const found = await api<{ found: boolean; title?: string; author?: string }>(`/api/isbn?isbn=${code}`);
+      if (found.found) {
+        setTitle(found.title ?? "");
+        setAuthor(found.author ?? "");
+        setMessage({ text: "U gjet! Kontrolloni titullin, pastaj zgjidhni raftin dhe vendin.", kind: "info" });
+      } else {
+        setMessage({
+          text: "Barkodi u lexua, por ky libër nuk gjendet në internet. Fotografoni kopertinën ose shkruani titullin.",
+          kind: "info",
+        });
+      }
+    } catch (err) {
+      setMessage({ text: (err as Error).message || "Barkodi nuk u lexua.", kind: "error" });
+    } finally {
+      setReadingBarcode(false);
+      if (barcodeRef.current) barcodeRef.current.value = "";
+    }
+  }
+
   async function save(addAnother: boolean) {
     if (!title.trim() || !shelf.trim() || position === "") {
       setMessage({ text: "Plotësoni titullin, raftin dhe vendin.", kind: "error" });
@@ -88,6 +125,7 @@ export function AddBookSheet({
           position: Number(position),
           is_read: isRead,
           library_id: library.id,
+          isbn,
         }),
       });
       saveLastShelf(library.id, book.shelf);
@@ -97,6 +135,7 @@ export function AddBookSheet({
       setTitle("");
       setAuthor("");
       setIsRead(false);
+      setIsbn(null);
       setPosition(String(book.position + 1));
       setPositionTouched(false);
       setMessage({ text: `„${book.title}“ u ruajt. Shtoni librin tjetër.`, kind: "info" });
@@ -118,6 +157,33 @@ export function AddBookSheet({
         className="flex flex-col gap-6"
       >
         <input
+          ref={barcodeRef}
+          id="barcode-photo-input"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          tabIndex={-1}
+          disabled={reading}
+          onChange={(e) => scanBarcode(e.target.files?.[0])}
+        />
+        <label
+          htmlFor="barcode-photo-input"
+          aria-disabled={reading}
+          className={`flex cursor-pointer items-center gap-4 rounded-2xl bg-accent p-4 text-left text-accent-ink shadow-card ${
+            reading ? "pointer-events-none opacity-70" : ""
+          }`}
+        >
+          <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/15 ${readingBarcode ? "animate-pulse" : ""}`}>
+            <BarcodeIcon className="h-8 w-8" />
+          </span>
+          <span>
+            <span className="block text-xl font-bold">{readingBarcode ? "Duke lexuar barkodin…" : "Fotografo barkodin"}</span>
+            <span className="block text-base opacity-80">Vijat me numra, në kopertinën e pasme</span>
+          </span>
+        </label>
+
+        <input
           ref={fileRef}
           id="cover-photo-input"
           type="file"
@@ -125,7 +191,7 @@ export function AddBookSheet({
           capture="environment"
           className="sr-only"
           tabIndex={-1}
-          disabled={scanning}
+          disabled={reading}
           onChange={(e) => scanCover(e.target.files?.[0])}
         />
         <label
@@ -277,7 +343,7 @@ export function AddBookSheet({
         <div className="flex flex-col gap-3">
           <button
             type="submit"
-            disabled={saving || scanning}
+            disabled={saving || reading}
             className="h-16 rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-md disabled:opacity-60"
           >
             {saving ? "Duke ruajtur…" : "Ruaj"}
@@ -285,7 +351,7 @@ export function AddBookSheet({
           <button
             type="button"
             onClick={() => save(true)}
-            disabled={saving || scanning}
+            disabled={saving || reading}
             className="h-16 rounded-2xl border-2 border-accent text-xl font-semibold text-accent-strong disabled:opacity-60"
           >
             Ruaj dhe shto tjetër

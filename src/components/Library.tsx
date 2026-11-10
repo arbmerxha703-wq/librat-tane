@@ -3,7 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MAIN_LIBRARY, type Book, type LibraryInfo, type NewBook } from "@/lib/types";
 import { compareByLocation, compareShelves, matchesQuery } from "@/lib/normalize";
-import { api, ApiError, booksLabel, getSavedLibrary, rememberBorrower, saveLibrary } from "@/lib/client";
+import {
+  api,
+  ApiError,
+  applyTextSize,
+  booksLabel,
+  downloadCatalog,
+  getSavedLibrary,
+  getTextSize,
+  rememberBorrower,
+  saveLibrary,
+  TEXT_SIZES,
+} from "@/lib/client";
 import { getSession, onSessionChange, setSession, takeRecoveryLink } from "@/lib/session";
 import { AuthScreen } from "./AuthScreen";
 import { BookCard } from "./BookCard";
@@ -31,6 +42,7 @@ export function Library() {
   const [libraries, setLibraries] = useState<LibraryInfo[]>([{ id: MAIN_LIBRARY, name: "Biblioteka kryesore" }]);
   const [chosenLibrary, setChosenLibrary] = useState(() => getSavedLibrary() ?? MAIN_LIBRARY);
   const [managingLibraries, setManagingLibraries] = useState(false);
+  const [textSize, setTextSize] = useState(getTextSize);
   const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
   const [chosenFilter, setFilter] = useState<Filter>("all");
@@ -582,7 +594,47 @@ export function Library() {
 
       <footer className="mt-12 flex flex-col items-center gap-3 text-center text-base text-muted">
         <span aria-hidden className="gold-rule block w-24" />
-        <p>
+
+        <div className="flex flex-col items-center gap-2">
+          <p id="text-size-label" className="text-lg font-semibold text-ink">
+            Madhësia e shkronjave
+          </p>
+          <div role="radiogroup" aria-labelledby="text-size-label" className="flex gap-2">
+            {TEXT_SIZES.map((t, i) => (
+              <button
+                key={t.value}
+                type="button"
+                role="radio"
+                aria-checked={textSize === t.value}
+                onClick={() => {
+                  applyTextSize(t.value);
+                  setTextSize(t.value);
+                }}
+                className={`flex h-14 min-w-16 items-center justify-center rounded-2xl px-4 font-serif font-bold ${
+                  textSize === t.value ? "bg-accent text-accent-ink shadow-card" : "bg-card text-ink ring-1 ring-line hover:ring-gold"
+                }`}
+                style={{ fontSize: `${1.1 + i * 0.3}rem` }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {books && books.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              downloadCatalog(books, (id) => libraries.find((l) => l.id === id)?.name ?? "");
+              setToast("Lista u shkarkua. E hapni me Excel.");
+            }}
+            className="mt-3 h-14 rounded-2xl px-5 text-lg font-semibold text-ink ring-1 ring-line hover:ring-gold"
+          >
+            Shkarko listën e librave (Excel)
+          </button>
+        )}
+
+        <p className="mt-3">
           Jeni brenda si <strong className="font-semibold break-all text-ink">{account || "kjo llogari"}</strong>
         </p>
         <button

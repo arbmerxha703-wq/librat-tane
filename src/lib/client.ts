@@ -189,3 +189,78 @@ export async function prepareShelfPhoto(file: File) {
   });
   return { photo: shrink(img, 1600), tiles };
 }
+
+const TEXT_SIZE_KEY = "booknest-text-size";
+/** Text size on this phone; everything is sized in rem, so the whole app grows with it. */
+export const TEXT_SIZES = [
+  { value: "100%", label: "A" },
+  { value: "112.5%", label: "A+" },
+  { value: "125%", label: "A++" },
+] as const;
+export const getTextSize = () => read(TEXT_SIZE_KEY) ?? "100%";
+export function applyTextSize(size: string) {
+  write(TEXT_SIZE_KEY, size);
+  document.documentElement.style.fontSize = size;
+}
+
+/** Runs before the page paints (see layout.tsx), so a bigger text size doesn't flash small first. */
+export const TEXT_SIZE_SCRIPT = `try{var s=localStorage.getItem(${JSON.stringify(TEXT_SIZE_KEY)});if(s)document.documentElement.style.fontSize=s}catch(e){}`;
+
+const csvCell = (v: string | number) => {
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+/**
+ * Saves the whole catalog as a CSV file that opens in Excel (UTF-8 with BOM, and a "sep=" line so
+ * Excel splits the columns whatever the computer's language) — a copy of the list kept by the family.
+ */
+export function downloadCatalog(books: Book[], libraryName: (id: string) => string) {
+  const header = ["Biblioteka", "Rafti", "Vendi", "Titulli", "Autori", "Lexuar", "Huazuar te", "Huazuar më", "ISBN"];
+  const rows = [...books]
+    .sort(
+      (a, b) =>
+        libraryName(a.library_id).localeCompare(libraryName(b.library_id), "sq") ||
+        a.shelf.localeCompare(b.shelf, "sq", { numeric: true }) ||
+        a.position - b.position,
+    )
+    .map((b) => [
+      libraryName(b.library_id),
+      b.shelf,
+      b.position,
+      b.title,
+      b.author,
+      b.is_read ? "Po" : "Jo",
+      b.loaned_to ?? "",
+      b.loaned_at ? b.loaned_at.slice(0, 10) : "",
+      b.isbn ?? "",
+    ]);
+  const csv = "\uFEFFsep=,\r\n" + [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `BookNest-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/**
+ * Reads a book's barcode (ISBN) from a photo. Safari has no built-in barcode reader, so ZXing
+ * (WebAssembly) is loaded the first time it's needed. Returns null when no book barcode is found.
+ */
+export async function readIsbn(file: File): Promise<string | null> {
+  const [{ BarcodeDetector }, img] = await Promise.all([import("barcode-detector/ponyfill"), loadImage(file)]);
+  // Phone photos are huge; 2000px keeps the bars sharp and the reading quick.
+  const scale = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.naturalWidth * scale);
+  canvas.height = Math.round(img.naturalHeight * scale);
+  canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const codes = await new BarcodeDetector({ formats: ["ean_13"] }).detect(canvas);
+  return codes.map((c) => c.rawValue).find((v) => /^97[89]\d{10}$/.test(v)) ?? null;
+}
+
+/** Cover picture from Open Library; it answers 404 (default=false) when it has none. */
+export const coverUrl = (isbn: string) => `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`;

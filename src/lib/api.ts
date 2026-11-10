@@ -21,6 +21,9 @@ const edge = z.number().int().min(0).max(1000).nullable().optional();
 /** "main", or the id given to a library added later. */
 export const libraryIdSchema = z.string().regex(/^[a-z0-9-]{1,40}$/);
 
+/** A book barcode: 13-digit ISBN (978… / 979…) or the older 10-character one. */
+export const isbnSchema = z.string().regex(/^(97[89]\d{10}|\d{9}[\dX])$/);
+
 const bookFields = {
   title: z.string().trim().min(1).max(300),
   author: z.string().trim().max(200),
@@ -28,6 +31,7 @@ const bookFields = {
   position: z.coerce.number().int().min(0).max(100000),
   is_read: z.boolean(),
   library_id: libraryIdSchema.optional(),
+  isbn: isbnSchema.nullable().optional(),
   photo_path: photoPathSchema.nullable().optional(),
   x0: edge,
   x1: edge,

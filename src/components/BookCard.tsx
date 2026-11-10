@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { Book } from "@/lib/types";
 import { matchRanges } from "@/lib/normalize";
-import { loanInfo, spineColor } from "@/lib/client";
+import { coverUrl, loanInfo, spineColor } from "@/lib/client";
 import { CheckIcon, DotsIcon, LendIcon, MapPinIcon } from "./icons";
 import { SpineThumb } from "./SpineThumb";
 
@@ -71,16 +72,7 @@ export function BookCard({
 
       <div className="flex gap-4 px-3 pt-4 pb-3">
         {!hasPhoto && (
-          // A small "cover" so books without a photo still read as books at a glance.
-          <div
-            aria-hidden
-            className="book-spine relative flex h-22 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg font-serif text-3xl font-bold text-white/90 shadow-card"
-            style={{ background: color }}
-          >
-            <span className="absolute inset-x-2 top-2 h-px bg-[#f0dca8]/60" />
-            {book.title.trim().charAt(0).toUpperCase()}
-            <span className="absolute inset-x-2 bottom-2 h-px bg-[#f0dca8]/60" />
-          </div>
+          <Cover title={book.title} isbn={book.isbn} color={color} />
         )}
         <div className="min-w-0 flex-1">
           <h3 className="font-serif text-[1.65rem] leading-tight font-bold break-words">
@@ -158,5 +150,37 @@ export function BookCard({
         </button>
       </div>
     </li>
+  );
+}
+
+/**
+ * The real cover when the book came from a barcode and Open Library has its picture; otherwise a
+ * small coloured "cover" with the first letter, so every book reads as a book at a glance.
+ */
+function Cover({ title, isbn, color }: { title: string; isbn?: string | null; color: string }) {
+  const [failed, setFailed] = useState(false);
+  if (isbn && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- remote cover, often missing (onError)
+      <img
+        src={coverUrl(isbn)}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="h-22 w-16 shrink-0 rounded-lg object-cover shadow-card ring-1 ring-line"
+      />
+    );
+  }
+  return (
+    <div
+      aria-hidden
+      className="book-spine relative flex h-22 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg font-serif text-3xl font-bold text-white/90 shadow-card"
+      style={{ background: color }}
+    >
+      <span className="absolute inset-x-2 top-2 h-px bg-[#f0dca8]/60" />
+      {title.trim().charAt(0).toUpperCase()}
+      <span className="absolute inset-x-2 bottom-2 h-px bg-[#f0dca8]/60" />
+    </div>
   );
 }

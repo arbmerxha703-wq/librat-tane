@@ -9,6 +9,8 @@ export type Book = {
   created_at: string;
   /** Which of the account's libraries (bookcases, rooms) the book is in; "main" for the first one. */
   library_id: string;
+  /** From the barcode, when the book was added that way; also gives the cover picture. */
+  isbn?: string | null;
   /** Photo of the shelf the book was scanned from (storage path), if any. */
   photo_path?: string | null;
   /** Left and right edge of the spine in that photo, 0–1000 of its width. */
@@ -27,6 +29,7 @@ export type NewBook = {
   is_read: boolean;
   /** Left out: the first library ("main"). */
   library_id?: string;
+  isbn?: string | null;
   photo_path?: string | null;
   x0?: number | null;
   x1?: number | null;
