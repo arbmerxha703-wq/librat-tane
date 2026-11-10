@@ -25,6 +25,7 @@ import { BookMenuSheet } from "./BookMenuSheet";
 import { EditBookSheet } from "./EditBookSheet";
 import { LibrariesSheet } from "./LibrariesSheet";
 import { ConfirmDialog } from "./Modal";
+import { shelfColor } from "@/lib/shelves";
 import { BookOpenIcon, CameraIcon, CheckIcon, ChevronRightIcon, CloseIcon, LendIcon, AppLogo, PlusIcon, SearchIcon, ShelvesIcon, SparkleIcon } from "./icons";
 
 type Filter = "all" | "read" | "unread" | "loaned";
@@ -40,7 +41,10 @@ export function Library() {
   const [books, setBooks] = useState<Book[] | null>(null);
   // The account's libraries (e.g. bookcases in different rooms) and the one open on this phone.
   const [libraries, setLibraries] = useState<LibraryInfo[]>([{ id: MAIN_LIBRARY, name: "Biblioteka kryesore" }]);
-  const [chosenLibrary, setChosenLibrary] = useState(() => getSavedLibrary() ?? MAIN_LIBRARY);
+  const [chosenLibrary, setChosenLibrary] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return (params.get("shelf") && params.get("library")) || getSavedLibrary() || MAIN_LIBRARY;
+  });
   const [managingLibraries, setManagingLibraries] = useState(false);
   const [textSize, setTextSize] = useState(getTextSize);
   const [loadError, setLoadError] = useState("");
@@ -58,6 +62,16 @@ export function Library() {
   const [removingSamples, setRemovingSamples] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
+  // Opened from a shelf's QR label: "/?library=…&shelf=…" shows only that shelf.
+  const [shelfView, setShelfView] = useState<{ library: string; shelf: string } | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shelf = params.get("shelf");
+    if (!shelf) return null;
+    const library = params.get("library") || MAIN_LIBRARY;
+    window.history.replaceState(null, "", "/");
+    saveLibrary(library);
+    return { library, shelf };
+  });
 
   // Signing in or out here, in another tab, or the session ending all come through here.
   useEffect(
@@ -125,6 +139,7 @@ export function Library() {
 
   function openLibrary(id: string) {
     setChosenLibrary(id);
+    setShelfView(null);
     saveLibrary(id);
   }
 
@@ -142,7 +157,11 @@ export function Library() {
 
   // Searching looks in every library, so nobody has to remember where a book is.
   const searching = query.trim() !== "";
-  const pool = useMemo(() => (searching ? (books ?? []) : libraryBooks), [searching, books, libraryBooks]);
+  const onShelf = shelfView && !searching && shelfView.library === library.id ? shelfView : null;
+  const pool = useMemo(
+    () => (searching ? (books ?? []) : onShelf ? libraryBooks.filter((b) => b.shelf === onShelf.shelf) : libraryBooks),
+    [searching, books, libraryBooks, onShelf],
+  );
 
   const counts = useMemo(() => {
     const all = pool.length;
@@ -512,6 +531,26 @@ export function Library() {
           </button>
         ))}
 
+      {onShelf && (
+        <div className="brass mt-4 flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
+          <p className="flex items-center gap-3 text-lg">
+            <span aria-hidden className="h-7 w-7 shrink-0 rounded-full ring-2 ring-white/50" style={{ background: shelfColor(onShelf.shelf).hex }} />
+            <span>
+              <strong>Rafti {onShelf.shelf}</strong>
+              {several && <> · {library.name}</>} · {booksLabel(pool.length)}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setShelfView(null)}
+            aria-label="Shfaq të gjithë librat"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
+          >
+            <CloseIcon className="h-6 w-6" />
+          </button>
+        </div>
+      )}
+
       <main className="mt-4 lg:mt-6" aria-live="polite">
         {books === null ? (
           <div className="py-12 text-center text-xl text-muted">
@@ -559,7 +598,10 @@ export function Library() {
                       <span className="eyebrow block text-gold">
                         {searching && several ? `${libraryName(lib)} · Rafti` : "Rafti"}
                       </span>
-                      <span className="font-serif text-4xl leading-none font-bold">{shelf}</span>
+                      <span className="flex items-center gap-3 font-serif text-4xl leading-none font-bold">
+                        <span aria-hidden className="h-6 w-6 rounded-full ring-2 ring-white/40" style={{ background: shelfColor(shelf).hex }} />
+                        {shelf}
+                      </span>
                     </span>
                     <span className="text-base font-medium text-muted">{booksLabel(list.length)}</span>
                   </span>
@@ -634,6 +676,15 @@ export function Library() {
           </button>
         )}
 
+        {books && books.length > 0 && (
+          <a
+            href="/etiketa"
+            className="flex h-14 items-center rounded-2xl px-5 text-lg font-semibold text-ink ring-1 ring-line hover:ring-gold"
+          >
+            Etiketat QR për raftet
+          </a>
+        )}
+
         <p className="mt-3">
           Jeni brenda si <strong className="font-semibold break-all text-ink">{account || "kjo llogari"}</strong>
         </p>
@@ -684,6 +735,8 @@ export function Library() {
           library={library}
           showLibrary={several}
           books={libraryBooks}
+          allBooks={books ?? []}
+          libraryName={libraryName}
           shelves={shelves}
           onClose={() => setAdding(false)}
           onSaved={(book) => {

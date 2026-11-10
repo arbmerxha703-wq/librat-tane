@@ -6,6 +6,7 @@ import { api } from "@/lib/client";
 import { Modal } from "./Modal";
 import { ShelfPhoto } from "./ShelfPhoto";
 import { ShelfOnMap } from "./LibraryMap";
+import { shelfColor, shelfInk } from "@/lib/shelves";
 
 /**
  * "Ku është?" — pictures first, so nobody has to count shelves: the library photo with a red circle on
@@ -84,6 +85,12 @@ export function LocateSheet({
             </>
           )}
           Rafti <strong>{book.shelf}</strong> · libri i <strong>{book.position}-të</strong> nga e majta
+        </p>
+        <p
+          className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-lg font-semibold"
+          style={{ background: shelfColor(book.shelf).hex, color: shelfInk(shelfColor(book.shelf)) }}
+        >
+          Kërkoni raftin me ngjitësen {shelfColor(book.shelf).name}
         </p>
       </div>
     </Modal>

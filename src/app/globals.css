@@ -197,3 +197,16 @@ mark {
     animation: none;
   }
 }
+
+/* Shelf labels (/etiketa): white A4 pages, colours kept */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    font-size: 12pt !important;
+  }
+}

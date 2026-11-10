@@ -6,6 +6,7 @@ import { matchRanges } from "@/lib/normalize";
 import { coverUrl, loanInfo, spineColor } from "@/lib/client";
 import { CheckIcon, DotsIcon, LendIcon, MapPinIcon } from "./icons";
 import { SpineThumb } from "./SpineThumb";
+import { shelfColor } from "@/lib/shelves";
 
 export function Highlight({ text, query }: { text: string; query: string }) {
   const ranges = matchRanges(text, query);
@@ -64,7 +65,7 @@ export function BookCard({
           <SpineThumb url={photoUrl!} x0={book.x0!} x1={book.x1!} />
           <span aria-hidden className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 to-transparent" />
           <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 text-base font-semibold text-white ring-1 ring-white/25 backdrop-blur-md">
-            <MapPinIcon className="h-4 w-4 text-[#f0dca8]" />
+            <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-white/70" style={{ background: shelfColor(book.shelf).hex }} />
             {where}
           </span>
         </button>
@@ -99,7 +100,7 @@ export function BookCard({
             <div className="mt-3 flex flex-wrap gap-2">
               {!hasPhoto && (
                 <span className="brass inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-base font-semibold">
-                  <MapPinIcon className="h-4 w-4" />
+                  <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-white/60" style={{ background: shelfColor(book.shelf).hex }} />
                   {where}
                 </span>
               )}

@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Book, LibraryInfo } from "@/lib/types";
 import { normalize } from "@/lib/normalize";
 import { api, getLastShelf, nextPosition, photoToBase64, readIsbn, saveLastShelf } from "@/lib/client";
+import { findDuplicates, shelfColor } from "@/lib/shelves";
 import { Modal } from "./Modal";
 import { BarcodeIcon, CameraIcon, CheckIcon, MinusIcon, PlusIcon } from "./icons";
 
@@ -13,6 +14,8 @@ const inputClass =
 export function AddBookSheet({
   library,
   books,
+  allBooks,
+  libraryName,
   shelves,
   onSaved,
   onClose,
@@ -23,6 +26,9 @@ export function AddBookSheet({
   /** Set when there are several libraries, to say which one the book goes into. */
   showLibrary: boolean;
   books: Book[];
+  /** Every library's books, to warn when this one is already in the catalog. */
+  allBooks: Book[];
+  libraryName: (id: string) => string | undefined;
   shelves: string[];
   onSaved: (book: Book) => void;
   onClose: () => void;
@@ -39,6 +45,11 @@ export function AddBookSheet({
   const reading = scanning || readingBarcode;
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; kind: "error" | "info" } | null>(null);
+  const duplicates = useMemo(() => findDuplicates(allBooks, title, author, isbn), [allBooks, title, author, isbn]);
+  // Saving a copy anyway takes a second press; changing the title asks again.
+  const dupKey = duplicates.map((b) => b.id).join();
+  const [acceptedDup, setAcceptedDup] = useState("");
+  const mustConfirm = duplicates.length > 0 && acceptedDup !== dupKey;
 
   const fileRef = useRef<HTMLInputElement>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
@@ -111,6 +122,11 @@ export function AddBookSheet({
   async function save(addAnother: boolean) {
     if (!title.trim() || !shelf.trim() || position === "") {
       setMessage({ text: "Plotësoni titullin, raftin dhe vendin.", kind: "error" });
+      return;
+    }
+    if (mustConfirm) {
+      setAcceptedDup(dupKey);
+      document.getElementById("duplicate-warning")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     setSaving(true);
@@ -251,6 +267,28 @@ export function AddBookSheet({
           />
         </Field>
 
+        {duplicates.length > 0 && (
+          <div id="duplicate-warning" role="alert" className="rounded-2xl border-2 border-gold bg-gold/10 p-4">
+            <p className="text-xl font-bold">Ky libër duket se e keni tashmë</p>
+            <ul className="mt-2 flex flex-col gap-1 text-lg">
+              {duplicates.slice(0, 3).map((b) => (
+                <li key={b.id}>
+                  <span className="font-serif font-semibold">„{b.title}“</span>
+                  {b.author && <span className="text-muted"> · {b.author}</span>}
+                  <br />
+                  <span className="inline-flex items-center gap-2">
+                    <span aria-hidden className="h-3.5 w-3.5 rounded-full" style={{ background: shelfColor(b.shelf).hex }} />
+                    {libraryName(b.library_id) && <>{libraryName(b.library_id)} · </>}Rafti {b.shelf}, Vendi {b.position}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-base text-muted">
+              {mustConfirm ? "Nëse keni edhe një kopje tjetër, mund ta ruani prapë." : "Shtypni „Ruaj“ edhe një herë për ta ruajtur prapë."}
+            </p>
+          </div>
+        )}
+
         <div className="brass rounded-2xl p-4">
           <p className="mb-3 text-sm font-bold tracking-[0.18em] uppercase opacity-80">
             Ku vendoset libri?{showLibrary && <span className="normal-case tracking-normal"> · {library.name}</span>}
@@ -269,10 +307,11 @@ export function AddBookSheet({
                     type="button"
                     onClick={() => changeShelf(s)}
                     aria-pressed={active}
-                    className={`h-12 min-w-12 rounded-xl px-4 text-xl font-bold ${
+                    className={`flex h-12 min-w-12 items-center gap-2 rounded-xl px-4 text-xl font-bold ${
                       active ? "bg-accent text-accent-ink" : "bg-card text-ink ring-1 ring-brass-line hover:ring-accent"
                     }`}
                   >
+                    <span aria-hidden className="h-3.5 w-3.5 rounded-full ring-1 ring-white/60" style={{ background: shelfColor(s).hex }} />
                     {s}
                   </button>
                 );
@@ -346,7 +385,7 @@ export function AddBookSheet({
             disabled={saving || reading}
             className="h-16 rounded-2xl bg-accent text-xl font-bold text-accent-ink shadow-md disabled:opacity-60"
           >
-            {saving ? "Duke ruajtur…" : "Ruaj"}
+            {saving ? "Duke ruajtur…" : acceptedDup && acceptedDup === dupKey ? "Ruaj prapë" : "Ruaj"}
           </button>
           <button
             type="button"
