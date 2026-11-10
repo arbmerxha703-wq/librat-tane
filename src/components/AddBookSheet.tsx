@@ -284,7 +284,7 @@ export function AddBookSheet({
               ))}
             </ul>
             <p className="mt-2 text-base text-muted">
-              {mustConfirm ? "Nëse keni edhe një kopje tjetër, mund ta ruani prapë." : "Shtypni „Ruaj“ edhe një herë për ta ruajtur prapë."}
+              {mustConfirm ? "Nëse keni edhe një kopje tjetër, mund ta ruani prapë." : "Shtypni „Ruaj prapë“ nëse është kopje tjetër."}
             </p>
           </div>
         )}
