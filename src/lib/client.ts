@@ -193,11 +193,11 @@ export async function prepareShelfPhoto(file: File) {
 const TEXT_SIZE_KEY = "booknest-text-size";
 /** Text size on this phone; everything is sized in rem, so the whole app grows with it. */
 export const TEXT_SIZES = [
-  { value: "100%", label: "A" },
-  { value: "112.5%", label: "A+" },
-  { value: "125%", label: "A++" },
+  { value: "112.5%", label: "A" },
+  { value: "125%", label: "A+" },
+  { value: "140%", label: "A++" },
 ] as const;
-export const getTextSize = () => read(TEXT_SIZE_KEY) ?? "100%";
+export const getTextSize = () => read(TEXT_SIZE_KEY) ?? "112.5%";
 export function applyTextSize(size: string) {
   write(TEXT_SIZE_KEY, size);
   document.documentElement.style.fontSize = size;
